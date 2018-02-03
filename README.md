@@ -1,6 +1,16 @@
-CMU 15-445/645: a course on the design and implementation of database management systems.
+[CMU 15-445/645 (Fall 2017) Database Systems](http://15445.courses.cs.cmu.edu/fall2017/). A course on the design and implementation of database management systems.
 
-http://15445.courses.cs.cmu.edu/fall2017/
+## Projects
+
+- [ ] Project 1 - Buffer Pool
+
+- [ ] Project 2 - B+Tree
+
+- [ ] Project 3 - Concurrency Control
+
+- [ ] Project 4 - Logging & Recovery
+
+- [ ] Project 5 - Extra Credit
 
 ## Homeworks
 
@@ -15,17 +25,4 @@ http://15445.courses.cs.cmu.edu/fall2017/
 - [ ] Homework 5 - Concurrency Control
 
 - [ ] Homework 6 - Recovery 
-
-
-## Projects
-
-- [ ] Project 1 - Buffer Pool
-
-- [ ] Project 2 - B+Tree
-
-- [ ] Project 3 - Concurrency Control
-
-- [ ] Project 4 - Logging & Recovery
-
-- [ ] Project 5 - Extra Credit
 
