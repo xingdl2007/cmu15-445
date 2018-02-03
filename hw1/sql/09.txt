@@ -1,0 +1,4 @@
+African American|Guilty|83.2160017879093
+African American|Not Guilty|16.7839982120907
+Caucasian|Guilty|90.8577145638419
+Caucasian|Not Guilty|9.14228543615813
