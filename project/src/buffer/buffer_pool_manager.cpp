@@ -25,7 +25,7 @@ BufferPoolManager::BufferPoolManager(size_t pool_size,
 }
 
 /*
- * BufferPoolManager Deconstructor
+ * BufferPoolManager Destructor
  * WARNING: Do Not Edit This Function
  */
 BufferPoolManager::~BufferPoolManager() {
@@ -69,8 +69,8 @@ bool BufferPoolManager::FlushPage(page_id_t page_id) { return false; }
 /**
  * User should call this method for deleting a page. This routine will call
  * disk manager to deallocate the page. First, if page is found within page
- * table, buffer pool manager should be reponsible for removing this entry out
- * of page table, reseting page metadata and adding back to free list. Second,
+ * table, buffer pool manager should be responsible for removing this entry out
+ * of page table, resetting page metadata and adding back to free list. Second,
  * call disk manager's DeallocatePage() method to delete from disk file. If
  * the page is found within page table, but pin_count != 0, return false
  */

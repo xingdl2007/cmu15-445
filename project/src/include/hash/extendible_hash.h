@@ -10,30 +10,58 @@
 #pragma once
 
 #include <cstdlib>
-#include <vector>
+#include <map>
+#include <memory>
+#include <mutex>
 #include <string>
+#include <vector>
 
 #include "hash/hash_table.h"
 
 namespace cmudb {
 
+// only support unique key
 template <typename K, typename V>
 class ExtendibleHash : public HashTable<K, V> {
+  struct Bucket {
+    Bucket() = default;
+    explicit Bucket(size_t i, int d) : id(i), depth(d) {}
+    std::map<K, V> items;          // key-value pairs
+    std::shared_ptr<Bucket> next;  // overflow bucket
+    size_t id = 0;                 // id of Bucket
+    int depth = 0;                 // local depth counter
+  };
 public:
   // constructor
-  ExtendibleHash(size_t size);
+  explicit ExtendibleHash(size_t size);
+
   // helper function to generate hash addressing
   size_t HashKey(const K &key);
+
   // helper function to get global & local depth
   int GetGlobalDepth() const;
+
   int GetLocalDepth(int bucket_id) const;
+
   int GetNumBuckets() const;
+
   // lookup and modifier
   bool Find(const K &key, V &value) override;
+
   bool Remove(const K &key) override;
+
   void Insert(const K &key, const V &value) override;
 
 private:
-  // add your own member variables here
+  std::unique_ptr<Bucket> split(std::shared_ptr<Bucket> &);
+  size_t bucketIndex(const K &key);
+
+  std::mutex mutex_;          // to protect shared data structure
+  const size_t bucket_size_;  // largest number of elements in a bucket
+  int bucket_count_;          // number of buckets in use
+  int depth;                  // global depth
+
+  std::vector<std::shared_ptr<Bucket>> buckets_;  // smart pointer for auto memory management
 };
+
 } // namespace cmudb

@@ -48,6 +48,34 @@ TEST(ExtendibleHashTest, SampleTest) {
   delete test;
 }
 
+// first split increase global depth from 0 to 3
+TEST(ExtendibleHashTest, DepthTest) {
+  // set leaf size as 2
+  ExtendibleHash<int, std::string> *test =
+      new ExtendibleHash<int, std::string>(2);
+
+  // insert several key/value pairs
+  test->Insert(6, "a");   // b'0110
+  test->Insert(10, "b");  // b'1110
+  test->Insert(14, "c");  // b'1010
+
+  EXPECT_EQ(3, test->GetGlobalDepth());
+
+  EXPECT_EQ(-1, test->GetLocalDepth(0));
+  EXPECT_EQ(-1, test->GetLocalDepth(1));
+  EXPECT_EQ(3, test->GetLocalDepth(2));
+  EXPECT_EQ(-1, test->GetLocalDepth(3));
+  EXPECT_EQ(-1, test->GetLocalDepth(4));
+  EXPECT_EQ(-1, test->GetLocalDepth(5));
+  EXPECT_EQ(3, test->GetLocalDepth(6));
+  EXPECT_EQ(-1, test->GetLocalDepth(7));
+
+  // two buckets in use
+  EXPECT_EQ(2, test->GetNumBuckets());
+
+  delete test;
+}
+
 TEST(ExtendibleHashTest, ConcurrentInsertTest) {
   const int num_runs = 50;
   const int num_threads = 3;

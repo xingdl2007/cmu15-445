@@ -17,10 +17,11 @@
 #include "page/page.h"
 
 namespace cmudb {
+
 class BufferPoolManager {
 public:
   BufferPoolManager(size_t pool_size, DiskManager *disk_manager,
-                          LogManager *log_manager = nullptr);
+                    LogManager *log_manager = nullptr);
 
   ~BufferPoolManager();
 
@@ -39,9 +40,10 @@ private:
   Page *pages_;      // array of pages
   DiskManager *disk_manager_;
   LogManager *log_manager_;
-  HashTable<page_id_t, Page *> *page_table_; // to keep track of pages
+  HashTable<page_id_t, Page *> *page_table_; // to keep track of pages that are currently in memory
   Replacer<Page *> *replacer_;   // to find an unpinned page for replacement
   std::list<Page *> *free_list_; // to find a free page for replacement
   std::mutex latch_;             // to protect shared data structure
 };
+
 } // namespace cmudb

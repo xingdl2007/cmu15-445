@@ -153,23 +153,17 @@ inline void outputLogHeader_(const char *file, int line, const char *func,
   ::strftime(time_str, 32, LOG_LOG_TIME_FORMAT, curTime);
   const char *type;
   switch (level) {
-  case LOG_LEVEL_ERROR:
-    type = "ERROR";
+  case LOG_LEVEL_ERROR:type = "ERROR";
     break;
-  case LOG_LEVEL_WARN:
-    type = "WARN ";
+  case LOG_LEVEL_WARN:type = "WARN ";
     break;
-  case LOG_LEVEL_INFO:
-    type = "INFO ";
+  case LOG_LEVEL_INFO:type = "INFO ";
     break;
-  case LOG_LEVEL_DEBUG:
-    type = "DEBUG";
+  case LOG_LEVEL_DEBUG:type = "DEBUG";
     break;
-  case LOG_LEVEL_TRACE:
-    type = "TRACE";
+  case LOG_LEVEL_TRACE:type = "TRACE";
     break;
-  default:
-    type = "UNKWN";
+  default:type = "UNKWN";
   }
   // PAVLO: DO NOT CHANGE THIS
   ::fprintf(LOG_OUTPUT_STREAM, "%s [%s:%d:%s] %s - ", time_str, file, line,
