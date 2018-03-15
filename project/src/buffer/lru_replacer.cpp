@@ -29,15 +29,18 @@ template <typename T> void LRUReplacer<T>::Insert(const T &value) {
     table_.emplace(value, tail_);
     ++size_;
   } else {
-    node *pre = it->second->pre;
-    std::unique_ptr<node> cur = std::move(pre->next);
-    pre->next = std::move(cur->next);
-    pre->next->pre = pre;
+    // not tail?
+    if (it->second != tail_) {
+      node *pre = it->second->pre;
+      std::unique_ptr<node> cur = std::move(pre->next);
+      pre->next = std::move(cur->next);
+      pre->next->pre = pre;
 
-    // add to tail
-    cur->pre = tail_;
-    tail_->next = std::move(cur);
-    tail_ = tail_->next.get();
+      // add to tail
+      cur->pre = tail_;
+      tail_->next = std::move(cur);
+      tail_ = tail_->next.get();
+    }
   }
 }
 
@@ -46,6 +49,7 @@ template <typename T> void LRUReplacer<T>::Insert(const T &value) {
  */
 template <typename T> bool LRUReplacer<T>::Victim(T &value) {
   std::lock_guard<std::mutex> lock(mutex_);
+
   if (size_ == 0) {
     assert(head_.get() == tail_);
     return false;
@@ -66,6 +70,7 @@ template <typename T> bool LRUReplacer<T>::Victim(T &value) {
  */
 template <typename T> bool LRUReplacer<T>::Erase(const T &value) {
   std::lock_guard<std::mutex> lock(mutex_);
+
   auto it = table_.find(value);
   if (it != table_.end()) {
     node *pre = it->second->pre;
