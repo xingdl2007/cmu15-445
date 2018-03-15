@@ -38,6 +38,7 @@ size_t ExtendibleHash<K, V>::HashKey(const K &key) {
  */
 template <typename K, typename V>
 int ExtendibleHash<K, V>::GetGlobalDepth() const {
+  std::lock_guard<std::mutex> lock(mutex_);
   return depth;
 }
 
@@ -47,6 +48,7 @@ int ExtendibleHash<K, V>::GetGlobalDepth() const {
  */
 template <typename K, typename V>
 int ExtendibleHash<K, V>::GetLocalDepth(int bucket_id) const {
+  std::lock_guard<std::mutex> lock(mutex_);
   assert(0 <= bucket_id && bucket_id < static_cast<int>(directory_.size()));
   if (directory_[bucket_id]) {
     return directory_[bucket_id]->depth;
@@ -59,6 +61,7 @@ int ExtendibleHash<K, V>::GetLocalDepth(int bucket_id) const {
  */
 template <typename K, typename V>
 int ExtendibleHash<K, V>::GetNumBuckets() const {
+  std::lock_guard<std::mutex> lock(mutex_);
   return bucket_count_;
 }
 
@@ -67,7 +70,9 @@ int ExtendibleHash<K, V>::GetNumBuckets() const {
  */
 template <typename K, typename V>
 bool ExtendibleHash<K, V>::Find(const K &key, V &value) {
+  std::lock_guard<std::mutex> lock(mutex_);
   size_t index = bucketIndex(key);
+
   if (directory_[index]) {
     auto bucket = directory_[index];
     if (bucket->items.find(key) != bucket->items.end()) {
@@ -94,7 +99,9 @@ bool ExtendibleHash<K, V>::Find(const K &key, V &value) {
 template <typename K, typename V>
 bool ExtendibleHash<K, V>::Remove(const K &key) {
   size_t cnt = 0;
+  std::lock_guard<std::mutex> lock(mutex_);
   size_t index = bucketIndex(key);
+
   if (directory_[index]) {
     auto bucket = directory_[index];
     cnt += bucket->items.erase(key);
@@ -155,6 +162,7 @@ ExtendibleHash<K, V>::split(std::shared_ptr<Bucket> &b) {
 
 /*
  * helper function to find bucket index
+ * should be called when holding the lock
  */
 template <typename K, typename V>
 size_t ExtendibleHash<K, V>::bucketIndex(const K &key) {
@@ -168,6 +176,7 @@ size_t ExtendibleHash<K, V>::bucketIndex(const K &key) {
  */
 template <typename K, typename V>
 void ExtendibleHash<K, V>::Insert(const K &key, const V &value) {
+  std::lock_guard<std::mutex> lock(mutex_);
   size_t bucket_id = bucketIndex(key);
 
   if (directory_[bucket_id] == nullptr) {

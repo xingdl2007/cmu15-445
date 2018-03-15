@@ -57,7 +57,7 @@ private:
   size_t bucketIndex(const K &key);
   //void dump(const K &key);
 
-  std::mutex mutex_;          // to protect shared data structure
+  mutable std::mutex mutex_;  // to protect shared data structure
   const size_t bucket_size_;  // largest number of elements in a bucket
   int bucket_count_;          // number of buckets in use
   int depth;                  // global depth
