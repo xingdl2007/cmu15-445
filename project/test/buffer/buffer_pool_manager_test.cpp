@@ -32,7 +32,7 @@ TEST(BufferPoolManagerTest, SampleTest) {
   for (int i = 10; i < 15; ++i) {
     EXPECT_EQ(nullptr, bpm.NewPage(temp_page_id));
   }
-  // upin the first five pages, add them to LRU list, set as dirty
+  // unpin the first five pages, add them to LRU list, set as dirty
   for (int i = 0; i < 5; ++i) {
     EXPECT_EQ(true, bpm.UnpinPage(i, true));
   }

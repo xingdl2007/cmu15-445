@@ -7,6 +7,7 @@
  */
 
 #pragma once
+
 #include <list>
 #include <mutex>
 
@@ -36,14 +37,17 @@ public:
   bool DeletePage(page_id_t page_id);
 
 private:
-  size_t pool_size_; // number of pages in buffer pool
-  Page *pages_;      // array of pages
+  size_t pool_size_;                         // number of pages in buffer pool
+  Page *pages_;                              // array of pages
   DiskManager *disk_manager_;
   LogManager *log_manager_;
+
   HashTable<page_id_t, Page *> *page_table_; // to keep track of pages that are currently in memory
-  Replacer<Page *> *replacer_;   // to find an unpinned page for replacement
-  std::list<Page *> *free_list_; // to find a free page for replacement
-  std::mutex latch_;             // to protect shared data structure
+
+  Replacer<Page *> *replacer_;               // to find an unpinned page for replacement
+  std::list<Page *> *free_list_;             // to find a free page for replacement
+
+  std::mutex latch_;                         // to protect shared data structure
 };
 
 } // namespace cmudb

@@ -1,6 +1,12 @@
 /**
  * disk_manager.cpp
+ *
+ * Disk manager takes care of the allocation and deallocation of pages within a
+ * database. It also performs read and write of pages to and from disk, and
+ * provides a logical file layer within the context of a database management
+ * system.
  */
+
 #include <assert.h>
 #include <cstring>
 #include <iostream>
