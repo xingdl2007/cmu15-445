@@ -3,6 +3,8 @@
  */
 
 #include <thread>
+#include <random>
+#include <map>
 
 #include "hash/extendible_hash.h"
 #include "gtest/gtest.h"
@@ -49,29 +51,68 @@ TEST(ExtendibleHashTest, SampleTest) {
 }
 
 // first split increase global depth from 0 to 3
-TEST(ExtendibleHashTest, DepthTest) {
+TEST(ExtendibleHashTest, BasicDepthTest) {
   // set leaf size as 2
   ExtendibleHash<int, std::string> *test =
       new ExtendibleHash<int, std::string>(2);
 
   // insert several key/value pairs
   test->Insert(6, "a");   // b'0110
-  test->Insert(10, "b");  // b'1110
-  test->Insert(14, "c");  // b'1010
+  test->Insert(10, "b");  // b'1010
+  test->Insert(14, "c");  // b'1110
 
   EXPECT_EQ(3, test->GetGlobalDepth());
 
+  EXPECT_EQ(3, test->GetLocalDepth(2));
+  EXPECT_EQ(3, test->GetLocalDepth(6));
+
   EXPECT_EQ(-1, test->GetLocalDepth(0));
   EXPECT_EQ(-1, test->GetLocalDepth(1));
-  EXPECT_EQ(3, test->GetLocalDepth(2));
   EXPECT_EQ(-1, test->GetLocalDepth(3));
   EXPECT_EQ(-1, test->GetLocalDepth(4));
   EXPECT_EQ(-1, test->GetLocalDepth(5));
-  EXPECT_EQ(3, test->GetLocalDepth(6));
   EXPECT_EQ(-1, test->GetLocalDepth(7));
 
   // two buckets in use
   EXPECT_EQ(2, test->GetNumBuckets());
+
+  // insert more key/value pairs
+  test->Insert(1, "d");
+  test->Insert(3, "e");
+  test->Insert(5, "f");
+
+  EXPECT_EQ(5, test->GetNumBuckets());
+  EXPECT_EQ(3, test->GetLocalDepth(1));
+  EXPECT_EQ(3, test->GetLocalDepth(3));
+  EXPECT_EQ(3, test->GetLocalDepth(5));
+
+  delete test;
+}
+
+TEST(ExtendibleHashTest, BasicRandomTest) {
+  // set leaf size as 2
+  ExtendibleHash<int, int> *test = new ExtendibleHash<int, int>(100);
+
+  // insert
+  int seed = time(nullptr);
+  std::cerr << "seed: " << seed << std::endl;
+  std::default_random_engine engine(seed);
+  std::uniform_int_distribution<int> distribution(0, 1000000);
+  std::map<int, int> comparator;
+  for (int i = 0; i < 1000000; ++i) {
+    auto item = distribution(engine);
+    comparator[item] = item;
+    test->Insert(item, item);
+    //std::cerr << std::dec << item << std::hex << "( 0x" << item << " )" << std::endl;
+  }
+
+  // compare result
+  int value = 0;
+  for (auto i: comparator) {
+    value = 0;
+    test->Find(i.first, value);
+    EXPECT_EQ(i.first, value);
+  }
 
   delete test;
 }
