@@ -35,6 +35,10 @@ public:
   // constructor
   explicit ExtendibleHash(size_t size);
 
+  // disable copy
+  ExtendibleHash(const ExtendibleHash &) = delete;
+  ExtendibleHash &operator=(const ExtendibleHash &) = delete;
+
   // helper function to generate hash addressing
   size_t HashKey(const K &key);
 
