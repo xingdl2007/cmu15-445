@@ -90,7 +90,6 @@ TEST(ExtendibleHashTest, BasicDepthTest) {
 }
 
 TEST(ExtendibleHashTest, BasicRandomTest) {
-  // set leaf size as 2
   ExtendibleHash<int, int> *test = new ExtendibleHash<int, int>(100);
 
   // insert
@@ -109,9 +108,13 @@ TEST(ExtendibleHashTest, BasicRandomTest) {
   // compare result
   int value = 0;
   for (auto i: comparator) {
-    value = 0;
     test->Find(i.first, value);
     EXPECT_EQ(i.first, value);
+    // delete
+    EXPECT_EQ(1, test->Remove(value));
+    // find again will fail
+    value = 0;
+    EXPECT_EQ(0, test->Find(i.first, value));
   }
 
   delete test;
