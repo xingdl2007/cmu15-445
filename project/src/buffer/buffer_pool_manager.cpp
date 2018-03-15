@@ -118,8 +118,9 @@ bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
     if (is_dirty) {
       page->is_dirty_ = true;
     }
+    return true;
   }
-  return true;
+  return false;
 }
 
 /*
