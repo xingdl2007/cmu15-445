@@ -57,16 +57,16 @@ TEST(LRUReplacerTest, BasicTest) {
     lru_replacer.Insert(99 - i);
   }
 
-  // erase the first 50
+  // erase 50 element from the tail
   for (int i = 0; i < 50; ++i) {
-    EXPECT_EQ(true, lru_replacer.Erase(99 - i));
+    EXPECT_EQ(true, lru_replacer.Erase(i));
   }
 
   // check left
   int value = -1;
-  for (int i = 50; i < 100; ++i) {
+  for (int i = 99; i >= 50; --i) {
     lru_replacer.Victim(value);
-    EXPECT_EQ(99 - i, value);
+    EXPECT_EQ(i, value);
     value = -1;
   }
 }

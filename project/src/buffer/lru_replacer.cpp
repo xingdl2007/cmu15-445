@@ -73,10 +73,15 @@ template <typename T> bool LRUReplacer<T>::Erase(const T &value) {
 
   auto it = table_.find(value);
   if (it != table_.end()) {
-    node *pre = it->second->pre;
-    std::unique_ptr<node> cur = std::move(pre->next);
-    pre->next = std::move(cur->next);
-    pre->next->pre = pre;
+    if (it->second != tail_) {
+      node *pre = it->second->pre;
+      std::unique_ptr<node> cur = std::move(pre->next);
+      pre->next = std::move(cur->next);
+      pre->next->pre = pre;
+    } else {
+      tail_ = tail_->pre;
+      tail_->next.release();
+    }
 
     table_.erase(value);
     if (--size_ == 0) {
