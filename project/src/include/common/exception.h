@@ -54,61 +54,37 @@ public:
   Exception(ExceptionType exception_type, std::string message)
       : std::runtime_error(message), type(exception_type) {
     std::string exception_message = "\nException Type :: " +
-                                    ExpectionTypeToString(exception_type) +
-                                    "\nMessage :: " + message + "\n";
+        ExpectionTypeToString(exception_type) +
+        "\nMessage :: " + message + "\n";
     std::cerr << exception_message;
   }
 
   std::string ExpectionTypeToString(ExceptionType type) {
     switch (type) {
-    case EXCEPTION_TYPE_INVALID:
-      return "Invalid";
-    case EXCEPTION_TYPE_OUT_OF_RANGE:
-      return "Out of Range";
-    case EXCEPTION_TYPE_CONVERSION:
-      return "Conversion";
-    case EXCEPTION_TYPE_UNKNOWN_TYPE:
-      return "Unknown Type";
-    case EXCEPTION_TYPE_DECIMAL:
-      return "Decimal";
-    case EXCEPTION_TYPE_MISMATCH_TYPE:
-      return "Mismatch Type";
-    case EXCEPTION_TYPE_DIVIDE_BY_ZERO:
-      return "Divide by Zero";
-    case EXCEPTION_TYPE_OBJECT_SIZE:
-      return "Object Size";
-    case EXCEPTION_TYPE_INCOMPATIBLE_TYPE:
-      return "Incompatible type";
-    case EXCEPTION_TYPE_SERIALIZATION:
-      return "Serialization";
-    case EXCEPTION_TYPE_TRANSACTION:
-      return "Transaction";
-    case EXCEPTION_TYPE_NOT_IMPLEMENTED:
-      return "Not implemented";
-    case EXCEPTION_TYPE_EXPRESSION:
-      return "Expression";
-    case EXCEPTION_TYPE_CATALOG:
-      return "Catalog";
-    case EXCEPTION_TYPE_PARSER:
-      return "Parser";
-    case EXCEPTION_TYPE_PLANNER:
-      return "Planner";
-    case EXCEPTION_TYPE_SCHEDULER:
-      return "Scheduler";
-    case EXCEPTION_TYPE_EXECUTOR:
-      return "Executor";
-    case EXCEPTION_TYPE_CONSTRAINT:
-      return "Constraint";
-    case EXCEPTION_TYPE_INDEX:
-      return "Index";
-    case EXCEPTION_TYPE_STAT:
-      return "Stat";
-    case EXCEPTION_TYPE_CONNECTION:
-      return "Connection";
-    case EXCEPTION_TYPE_SYNTAX:
-      return "Syntax";
-    default:
-      return "Unknown";
+    case EXCEPTION_TYPE_INVALID:return "Invalid";
+    case EXCEPTION_TYPE_OUT_OF_RANGE:return "Out of Range";
+    case EXCEPTION_TYPE_CONVERSION:return "Conversion";
+    case EXCEPTION_TYPE_UNKNOWN_TYPE:return "Unknown Type";
+    case EXCEPTION_TYPE_DECIMAL:return "Decimal";
+    case EXCEPTION_TYPE_MISMATCH_TYPE:return "Mismatch Type";
+    case EXCEPTION_TYPE_DIVIDE_BY_ZERO:return "Divide by Zero";
+    case EXCEPTION_TYPE_OBJECT_SIZE:return "Object Size";
+    case EXCEPTION_TYPE_INCOMPATIBLE_TYPE:return "Incompatible type";
+    case EXCEPTION_TYPE_SERIALIZATION:return "Serialization";
+    case EXCEPTION_TYPE_TRANSACTION:return "Transaction";
+    case EXCEPTION_TYPE_NOT_IMPLEMENTED:return "Not implemented";
+    case EXCEPTION_TYPE_EXPRESSION:return "Expression";
+    case EXCEPTION_TYPE_CATALOG:return "Catalog";
+    case EXCEPTION_TYPE_PARSER:return "Parser";
+    case EXCEPTION_TYPE_PLANNER:return "Planner";
+    case EXCEPTION_TYPE_SCHEDULER:return "Scheduler";
+    case EXCEPTION_TYPE_EXECUTOR:return "Executor";
+    case EXCEPTION_TYPE_CONSTRAINT:return "Constraint";
+    case EXCEPTION_TYPE_INDEX:return "Index";
+    case EXCEPTION_TYPE_STAT:return "Stat";
+    case EXCEPTION_TYPE_CONNECTION:return "Connection";
+    case EXCEPTION_TYPE_SYNTAX:return "Syntax";
+    default:return "Unknown";
     }
   }
 
@@ -139,9 +115,9 @@ public:
                            const TypeId newType)
       : Exception(EXCEPTION_TYPE_CONVERSION,
                   "Type " + Type::TypeIdToString(origType) + " with value " +
-                      std::to_string((intmax_t)value) +
+                      std::to_string((intmax_t) value) +
                       " can't be cast as %s because the value is out of range "
-                      "for the destination type " +
+                          "for the destination type " +
                       Type::TypeIdToString(newType)) {}
 
   ValueOutOfRangeException(const double value, const TypeId origType,
@@ -150,14 +126,14 @@ public:
                   "Type " + Type::TypeIdToString(origType) + " with value " +
                       std::to_string(value) +
                       " can't be cast as %s because the value is out of range "
-                      "for the destination type " +
+                          "for the destination type " +
                       Type::TypeIdToString(newType)) {}
 
   ValueOutOfRangeException(const TypeId varType, const size_t length)
       : Exception(EXCEPTION_TYPE_OUT_OF_RANGE,
                   "The value is too long to fit into type " +
                       Type::TypeIdToString(varType) + "(" +
-                      std::to_string(length) + ")"){};
+                      std::to_string(length) + ")") {};
 };
 
 class ConversionException : public Exception {

@@ -17,7 +17,7 @@ bool HeaderPage::InsertRecord(const std::string &name,
   assert(root_id > INVALID_PAGE_ID);
 
   int record_num = GetRecordCount();
-  int offset = 4 + record_num * 36;
+  int offset = 4 + record_num*36;
   // check for duplicate name
   if (FindRecord(name) != -1)
     return false;
@@ -37,9 +37,9 @@ bool HeaderPage::DeleteRecord(const std::string &name) {
   // record does not exsit
   if (index == -1)
     return false;
-  int offset = index * 36 + 4;
+  int offset = index*36 + 4;
   memmove(GetData() + offset, GetData() + offset + 36,
-          (record_num - index - 1) * 36);
+          (record_num - index - 1)*36);
 
   SetRecordCount(record_num - 1);
   return true;
@@ -53,7 +53,7 @@ bool HeaderPage::UpdateRecord(const std::string &name,
   // record does not exsit
   if (index == -1)
     return false;
-  int offset = index * 36 + 4;
+  int offset = index*36 + 4;
   // update record content, only root_id
   memcpy((GetData() + offset + 32), &root_id, 4);
 
@@ -64,10 +64,10 @@ bool HeaderPage::GetRootId(const std::string &name, page_id_t &root_id) {
   assert(name.length() < 32);
 
   int index = FindRecord(name);
-  // record does not exsit
+  // record does not exist
   if (index == -1)
     return false;
-  int offset = (index + 1) * 36;
+  int offset = (index + 1)*36;
   root_id = *reinterpret_cast<page_id_t *>(GetData() + offset);
 
   return true;
@@ -87,7 +87,7 @@ int HeaderPage::FindRecord(const std::string &name) {
   int record_num = GetRecordCount();
 
   for (int i = 0; i < record_num; i++) {
-    char *raw_name = reinterpret_cast<char *>(GetData() + (4 + i * 36));
+    char *raw_name = reinterpret_cast<char *>(GetData() + (4 + i*36));
     if (strcmp(raw_name, name.c_str()) == 0)
       return i;
   }

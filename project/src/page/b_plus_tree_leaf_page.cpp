@@ -194,14 +194,9 @@ std::string B_PLUS_TREE_LEAF_PAGE_TYPE::ToString(bool verbose) const {
   return stream.str();
 }
 
-template class BPlusTreeLeafPage<GenericKey<4>, RID,
-                                       GenericComparator<4>>;
-template class BPlusTreeLeafPage<GenericKey<8>, RID,
-                                       GenericComparator<8>>;
-template class BPlusTreeLeafPage<GenericKey<16>, RID,
-                                       GenericComparator<16>>;
-template class BPlusTreeLeafPage<GenericKey<32>, RID,
-                                       GenericComparator<32>>;
-template class BPlusTreeLeafPage<GenericKey<64>, RID,
-                                       GenericComparator<64>>;
+template class BPlusTreeLeafPage<GenericKey<4>, RID, GenericComparator<4>>;
+template class BPlusTreeLeafPage<GenericKey<8>, RID, GenericComparator<8>>;
+template class BPlusTreeLeafPage<GenericKey<16>, RID, GenericComparator<16>>;
+template class BPlusTreeLeafPage<GenericKey<32>, RID, GenericComparator<32>>;
+template class BPlusTreeLeafPage<GenericKey<64>, RID, GenericComparator<64>>;
 } // namespace cmudb

@@ -14,9 +14,9 @@ namespace cmudb {
 
 INDEX_TEMPLATE_ARGUMENTS
 BPLUSTREE_TYPE::BPlusTree(const std::string &name,
-                                BufferPoolManager *buffer_pool_manager,
-                                const KeyComparator &comparator,
-                                page_id_t root_page_id)
+                          BufferPoolManager *buffer_pool_manager,
+                          const KeyComparator &comparator,
+                          page_id_t root_page_id)
     : index_name_(name), root_page_id_(root_page_id),
       buffer_pool_manager_(buffer_pool_manager), comparator_(comparator) {}
 
@@ -25,6 +25,7 @@ BPLUSTREE_TYPE::BPlusTree(const std::string &name,
  */
 INDEX_TEMPLATE_ARGUMENTS
 bool BPLUSTREE_TYPE::IsEmpty() const { return true; }
+
 /*****************************************************************************
  * SEARCH
  *****************************************************************************/

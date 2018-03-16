@@ -6,7 +6,7 @@
  * It actually serves as a header part for each B+ tree page and
  * contains information shared by both leaf page and internal page.
  *
- * Header format (size in byte, 20 bytes in total):
+ * Header format (size in byte, 24 bytes in total):
  * ----------------------------------------------------------------------------
  * | PageType (4) | LSN (4) | CurrentSize (4) | MaxSize (4) |
  * ----------------------------------------------------------------------------

@@ -8,6 +8,7 @@
  * (3) The structure should shrink and grow dynamically
  * (4) Implement index iterator for range scan
  */
+
 #pragma once
 
 #include <queue>
@@ -21,14 +22,15 @@
 namespace cmudb {
 
 #define BPLUSTREE_TYPE BPlusTree<KeyType, ValueType, KeyComparator>
+
 // Main class providing the API for the Interactive B+ Tree.
-INDEX_TEMPLATE_ARGUMENTS
+template <typename KeyType, typename ValueType, typename KeyComparator>
 class BPlusTree {
 public:
   explicit BPlusTree(const std::string &name,
-                           BufferPoolManager *buffer_pool_manager,
-                           const KeyComparator &comparator,
-                           page_id_t root_page_id = INVALID_PAGE_ID);
+                     BufferPoolManager *buffer_pool_manager,
+                     const KeyComparator &comparator,
+                     page_id_t root_page_id = INVALID_PAGE_ID);
 
   // Returns true if this B+ tree has no keys and values.
   bool IsEmpty() const;
@@ -45,8 +47,8 @@ public:
                 Transaction *transaction = nullptr);
 
   // index iterator
-  INDEXITERATOR_TYPE Begin();
-  INDEXITERATOR_TYPE Begin(const KeyType &key);
+  IndexIterator<KeyType, ValueType, KeyComparator> Begin();
+  IndexIterator<KeyType, ValueType, KeyComparator> Begin(const KeyType &key);
 
   // Print this B+ tree to stdout using a simple command-line
   std::string ToString(bool verbose = false);
@@ -58,9 +60,10 @@ public:
   // read data from file and remove one by one
   void RemoveFromFile(const std::string &file_name,
                       Transaction *transaction = nullptr);
+
   // expose for test purpose
-  B_PLUS_TREE_LEAF_PAGE_TYPE *FindLeafPage(const KeyType &key,
-                                           bool leftMost = false);
+  BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *FindLeafPage(const KeyType &key,
+                                                                     bool leftMost = false);
 
 private:
   void StartNewTree(const KeyType &key, const ValueType &value);
