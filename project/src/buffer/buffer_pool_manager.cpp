@@ -78,6 +78,7 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
     }
   }
 
+  assert(res->pin_count_ == 0);
   // dirty? write back
   if (res->is_dirty_) {
     disk_manager_->WritePage(res->page_id_, res->GetData());
@@ -185,6 +186,8 @@ Page *BufferPoolManager::NewPage(page_id_t &page_id) {
       return nullptr;
     }
   }
+
+  assert(res->pin_count_ == 0);
   page_id = disk_manager_->AllocatePage();
 
   // dirty? write back
