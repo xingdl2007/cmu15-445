@@ -155,6 +155,7 @@ bool BufferPoolManager::DeletePage(page_id_t page_id) {
   Page *page;
   if (page_table_->Find(page_id, page) && page->pin_count_ == 0) {
     page_table_->Remove(page_id);
+    replacer_->Erase(page);
     disk_manager_->DeallocatePage(page_id);
 
     page->page_id_ = INVALID_PAGE_ID;

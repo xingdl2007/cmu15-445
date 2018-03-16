@@ -26,6 +26,10 @@ public:
 
   ~BufferPoolManager();
 
+  // disable copy
+  BufferPoolManager(BufferPoolManager const &) = delete;
+  BufferPoolManager &operator=(BufferPoolManager const &) = delete;
+
   Page *FetchPage(page_id_t page_id);
 
   bool UnpinPage(page_id_t page_id, bool is_dirty);
