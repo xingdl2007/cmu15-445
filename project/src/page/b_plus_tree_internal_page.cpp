@@ -27,8 +27,10 @@ Init(page_id_t page_id, page_id_t parent_id) {
   SetPageId(page_id);
   // set parent id
   SetParentPageId(parent_id);
+
   // set max page size, header is 24bytes
-  int size = (PAGE_SIZE - sizeof(BPlusTreePage))/(sizeof(KeyType) + sizeof(ValueType));
+  int size = (PAGE_SIZE - sizeof(BPlusTreeInternalPage))/
+      (sizeof(KeyType) + sizeof(ValueType));
   SetMaxSize(size);
 }
 
@@ -170,25 +172,22 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 void BPlusTreeInternalPage<KeyType, ValueType, KeyComparator>::
 MoveHalfTo(BPlusTreeInternalPage *recipient,
            BufferPoolManager *buffer_pool_manager) {
-  auto half = GetSize()/2 + 1;
-  auto page_id = recipient->GetPageId();
-
+  auto half = GetSize()/2;
   recipient->CopyHalfFrom(array + GetSize() - half, half, buffer_pool_manager);
-
-  // extra '-1' is for the split key which will promote to parent
   IncreaseSize(-1*half);
 
-  // promote last key to parent
-  KeyType split = array[GetSize()].first;
+  // promote recipient's first key to parent
+  KeyType split = recipient->KeyAt(0);
 
   // parent of current internal page
   auto parent = reinterpret_cast<BPlusTreeInternalPage *>(
       buffer_pool_manager->FetchPage(GetParentPageId()));
 
   // insert to parent, after the original pointer
-  parent->InsertNodeAfter(GetPageId(), split, page_id);
+  parent->InsertNodeAfter(GetPageId(), split, recipient->GetPageId());
+
   // unpin when done, set dirty flag
-  buffer_pool_manager->UnpinPage(GetParentPageId(), true);
+  buffer_pool_manager->UnpinPage(parent->GetPageId(), true);
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
@@ -196,13 +195,11 @@ void BPlusTreeInternalPage<KeyType, ValueType, KeyComparator>::
 CopyHalfFrom(MappingType *items, int size,
              BufferPoolManager *buffer_pool_manager) {
   // must be a new page
-  assert(GetSize() == 1);
+  assert(!IsLeafPage() && GetSize() == 1);
   for (int i = 0; i < size; ++i) {
     array[i] = *items++;
   }
   IncreaseSize(size);
-
-  buffer_pool_manager->UnpinPage(GetPageId(), true);
 }
 
 /*****************************************************************************
@@ -266,8 +263,6 @@ CopyAllFrom(MappingType *items, int size,
     array[i] = *items++;
   }
   IncreaseSize(size);
-
-  buffer_pool_manager->UnpinPage(GetPageId(), true);
 }
 
 /*****************************************************************************
@@ -281,31 +276,32 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 void BPlusTreeInternalPage<KeyType, ValueType, KeyComparator>::
 MoveFirstToEndOf(BPlusTreeInternalPage *recipient,
                  BufferPoolManager *buffer_pool_manager) {
-  auto parent = reinterpret_cast<BPlusTreeInternalPage *>(
-      buffer_pool_manager->FetchPage(GetParentPageId()));
-
-  auto index = parent->ValueIndex(GetPageId());
-  auto key = parent->KeyAt(index);
-
-  MappingType pair = {key, ValueAt(0)};
-  recipient->CopyLastFrom(pair, buffer_pool_manager);
-
-  auto split = KeyAt(1);
-  parent->SetKeyAt(index, split);
-  array[0].second = ValueAt(1);
+  assert(GetSize() > 1);
+  MappingType pair = array[1];
+  array[0] = array[1];
   Remove(1);
 
-  buffer_pool_manager->UnpinPage(parent->GetPageId(), true);
+  // delegate to helper function
+  recipient->CopyLastFrom(pair, buffer_pool_manager);
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void BPlusTreeInternalPage<KeyType, ValueType, KeyComparator>::
 CopyLastFrom(const MappingType &pair, BufferPoolManager *buffer_pool_manager) {
   assert(GetSize() + 1 < GetMaxSize());
-  array[GetSize()] = pair;
-  IncreaseSize(1);
 
-  buffer_pool_manager->UnpinPage(GetPageId(), true);
+  auto parent = reinterpret_cast<BPlusTreeInternalPage *>(
+      buffer_pool_manager->FetchPage(GetParentPageId()));
+
+  auto index = parent->ValueIndex(GetPageId());
+  auto key = parent->KeyAt(index + 1);
+
+  array[GetSize()] = {key, pair.second};
+  IncreaseSize(1);
+  parent->SetKeyAt(index + 1, pair.first);
+
+  // unpin when we are done
+  buffer_pool_manager->UnpinPage(parent->GetPageId(), true);
 }
 
 /*
@@ -316,18 +312,10 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 void BPlusTreeInternalPage<KeyType, ValueType, KeyComparator>::
 MoveLastToFrontOf(BPlusTreeInternalPage *recipient, int parent_index,
                   BufferPoolManager *buffer_pool_manager) {
-  auto parent = reinterpret_cast<BPlusTreeInternalPage *>(
-      buffer_pool_manager->FetchPage(GetParentPageId()));
-
-  auto key = parent->KeyAt(parent_index);
-  // set parent key to the last of current page
-  parent->SetKeyAt(parent_index, KeyAt(GetSize() - 1));
-  MappingType pair = {key, ValueAt(GetSize() - 1)};
-
+  assert(GetSize() > 1);
   IncreaseSize(-1);
+  MappingType pair = array[GetSize()];
   recipient->CopyFirstFrom(pair, parent_index, buffer_pool_manager);
-
-  buffer_pool_manager->UnpinPage(parent->GetPageId(), true);
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
@@ -336,10 +324,18 @@ CopyFirstFrom(const MappingType &pair, int parent_index,
               BufferPoolManager *buffer_pool_manager) {
   assert(GetSize() + 1 < GetMaxSize());
 
-  InsertNodeAfter(array[0].second, pair.first, array[0].second);
+  auto parent = reinterpret_cast<BPlusTreeInternalPage *>(
+      buffer_pool_manager->FetchPage(GetParentPageId()));
+
+  auto key = parent->KeyAt(parent_index);
+
+  // set parent key to the last of current page
+  parent->SetKeyAt(parent_index, pair.first);
+
+  InsertNodeAfter(array[0].second, key, array[0].second);
   array[0].second = pair.second;
 
-  buffer_pool_manager->UnpinPage(GetPageId(), true);
+  buffer_pool_manager->UnpinPage(parent->GetPageId(), true);
 }
 
 /*****************************************************************************
