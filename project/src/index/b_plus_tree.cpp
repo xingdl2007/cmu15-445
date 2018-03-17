@@ -1,6 +1,7 @@
 /**
  * b_plus_tree.cpp
  */
+
 #include <iostream>
 #include <string>
 
@@ -26,7 +27,7 @@ BPlusTree(const std::string &name,
  */
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool BPlusTree<KeyType, ValueType, KeyComparator>::
-IsEmpty() const { return true; }
+IsEmpty() const { return root_page_id_ == INVALID_PAGE_ID; }
 
 /*****************************************************************************
  * SEARCH
@@ -40,6 +41,42 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 bool BPlusTree<KeyType, ValueType, KeyComparator>::
 GetValue(const KeyType &key, std::vector<ValueType> &result,
          Transaction *transaction) {
+  // empty?
+  if (IsEmpty()) {
+    return false;
+  }
+  auto *node = reinterpret_cast<BPlusTreePage *>(
+      buffer_pool_manager_->FetchPage(root_page_id_));
+
+  // no buffer?
+  if (node == nullptr) {
+    return false;
+  }
+
+  // find the leaf node
+  while (node->IsLeafPage()) {
+    auto internal = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>(node);
+    page_id_t next = internal->Lookup(key, comparator_);
+
+    node = reinterpret_cast<BPlusTreePage *>(
+        buffer_pool_manager_->FetchPage(next));
+
+    // if no buffer, return immediately
+    if (node == nullptr) {
+      return false;
+    }
+
+    // necessary?
+    buffer_pool_manager_->UnpinPage(node->GetPageId(), false);
+  }
+
+  auto *leaf = reinterpret_cast<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *>(node);
+  ValueType value;
+  if (leaf->Lookup(key, value, comparator_)) {
+    result.push_back(value);
+    buffer_pool_manager_->UnpinPage(leaf->GetPageId(), false);
+    return true;
+  }
   return false;
 }
 
@@ -56,7 +93,11 @@ GetValue(const KeyType &key, std::vector<ValueType> &result,
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool BPlusTree<KeyType, ValueType, KeyComparator>::
 Insert(const KeyType &key, const ValueType &value, Transaction *transaction) {
-  return false;
+  if (IsEmpty()) {
+    StartNewTree(key, value);
+    return true;
+  }
+  return InsertIntoLeaf(key, value, transaction);
 }
 
 /*
@@ -68,20 +109,60 @@ Insert(const KeyType &key, const ValueType &value, Transaction *transaction) {
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void BPlusTree<KeyType, ValueType, KeyComparator>::
 StartNewTree(const KeyType &key, const ValueType &value) {
+  auto root = reinterpret_cast<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *>(
+      buffer_pool_manager_->NewPage(root_page_id_));
 
+  // throw "out of memory" exception
+  if (root == nullptr) {
+    throw std::bad_alloc();
+  }
+  UpdateRootPageId(true);
+  root->Insert(key, value, comparator_);
 }
 
 /*
  * Insert constant key & value pair into leaf page
  * User needs to first find the right leaf page as insertion target, then look
  * through leaf page to see whether insert key exist or not. If exist, return
- * immdiately, otherwise insert entry. Remember to deal with split if necessary.
+ * immediately, otherwise insert entry. Remember to deal with split if necessary.
  * @return: since we only support unique key, if user try to insert duplicate
  * keys return false, otherwise return true.
  */
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool BPlusTree<KeyType, ValueType, KeyComparator>::
 InsertIntoLeaf(const KeyType &key, const ValueType &value, Transaction *transaction) {
+  auto node = reinterpret_cast<BPlusTreePage *>(
+      buffer_pool_manager_->FetchPage(root_page_id_));
+
+  while (!node->IsLeafPage()) {
+    auto child_page_id =
+        reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>
+        (node)->Lookup(key, comparator_);
+
+    buffer_pool_manager_->UnpinPage(node->GetPageId(), false);
+
+    node = reinterpret_cast<BPlusTreePage *>(
+        buffer_pool_manager_->FetchPage(child_page_id));
+  }
+
+  auto leaf = reinterpret_cast<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *>(node);
+  if (leaf->GetSize() < leaf->GetMaxSize()) {
+    ValueType v;
+    if (leaf->Lookup(key, v, comparator_)) {
+      return false;
+    }
+    leaf->Insert(key, value, comparator_);
+  } else {
+    // split
+    auto *leaf2 = Split<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>(leaf);
+    if (comparator_(key, leaf2->KeyAt(0)) < 0) {
+      leaf->Insert(key, value, comparator_);
+    } else {
+      leaf2->Insert(key, value, comparator_);
+    }
+    InsertIntoParent(leaf, leaf2->KeyAt(0), leaf2, transaction);
+  }
+
   return false;
 }
 
@@ -94,7 +175,9 @@ InsertIntoLeaf(const KeyType &key, const ValueType &value, Transaction *transact
  */
 template <typename KeyType, typename ValueType, typename KeyComparator>
 template <typename N> N *BPlusTree<KeyType, ValueType, KeyComparator>::
-Split(N *node) { return nullptr; }
+Split(N *node) {
+  return nullptr;
+}
 
 /*
  * Insert key & value pair into internal page after split
@@ -187,7 +270,7 @@ Redistribute(N *neighbor_node, N *node, int index) {
  * has one last child
  * case 2: when you delete the last element in whole b+ tree
  * @return : true means root page should be deleted, false means no deletion
- * happend
+ * happened
  */
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool BPlusTree<KeyType, ValueType, KeyComparator>::
@@ -234,28 +317,29 @@ FindLeafPage(const KeyType &key, bool leftMost) {
 /*
  * Update/Insert root page id in header page(where page_id = 0, header_page is
  * defined under include/page/header_page.h)
- * Call this method everytime root page id is changed.
- * @parameter: insert_record      defualt value is false. When set to true,
+ * Call this method every time root page id is changed.
+ * @parameter: insert_record default value is false. When set to true,
  * insert a record <index_name, root_page_id> into header page instead of
  * updating it.
  */
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void BPlusTree<KeyType, ValueType, KeyComparator>::
-UpdateRootPageId(int insert_record) {
-  HeaderPage *header_page = static_cast<HeaderPage *>(
+UpdateRootPageId(bool insert_record) {
+  auto *header_page = static_cast<HeaderPage *>(
       buffer_pool_manager_->FetchPage(HEADER_PAGE_ID));
-  if (insert_record)
+  if (insert_record) {
     // create a new record<index_name + root_page_id> in header_page
     header_page->InsertRecord(index_name_, root_page_id_);
-  else
+  } else {
     // update root_page_id in header_page
     header_page->UpdateRecord(index_name_, root_page_id_);
+  }
   buffer_pool_manager_->UnpinPage(HEADER_PAGE_ID, true);
 }
 
 /*
  * This method is used for debug only
- * print out whole b+tree sturcture, rank by rank
+ * print out whole b+tree structure, rank by rank
  */
 template <typename KeyType, typename ValueType, typename KeyComparator>
 std::string BPlusTree<KeyType, ValueType, KeyComparator>::
@@ -279,6 +363,7 @@ InsertFromFile(const std::string &file_name, Transaction *transaction) {
     Insert(index_key, rid, transaction);
   }
 }
+
 /*
  * This method is used for test only
  * Read data from file and remove one by one

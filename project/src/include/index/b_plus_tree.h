@@ -89,7 +89,7 @@ private:
 
   bool AdjustRoot(BPlusTreePage *node);
 
-  void UpdateRootPageId(int insert_record = false);
+  void UpdateRootPageId(bool insert_record = false);
 
   // member variable
   std::string index_name_;
