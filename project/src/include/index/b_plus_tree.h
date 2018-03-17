@@ -62,8 +62,8 @@ public:
                       Transaction *transaction = nullptr);
 
   // expose for test purpose
-  BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *FindLeafPage(const KeyType &key,
-                                                                     bool leftMost = false);
+  BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *
+  FindLeafPage(const KeyType &key, bool leftMost = false);
 
 private:
   void StartNewTree(const KeyType &key, const ValueType &value);
@@ -81,10 +81,9 @@ private:
   bool CoalesceOrRedistribute(N *node, Transaction *transaction = nullptr);
 
   template <typename N>
-  bool Coalesce(
-      N *&neighbor_node, N *&node,
-      BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *&parent,
-      int index, Transaction *transaction = nullptr);
+  bool Coalesce(N *&neighbor_node, N *&node,
+                BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *&parent,
+                int index, Transaction *transaction = nullptr);
 
   template <typename N> void Redistribute(N *neighbor_node, N *node, int index);
 

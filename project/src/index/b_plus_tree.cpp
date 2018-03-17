@@ -12,19 +12,21 @@
 
 namespace cmudb {
 
-INDEX_TEMPLATE_ARGUMENTS
-BPLUSTREE_TYPE::BPlusTree(const std::string &name,
-                          BufferPoolManager *buffer_pool_manager,
-                          const KeyComparator &comparator,
-                          page_id_t root_page_id)
+template <typename KeyType, typename ValueType, typename KeyComparator>
+BPlusTree<KeyType, ValueType, KeyComparator>::
+BPlusTree(const std::string &name,
+          BufferPoolManager *buffer_pool_manager,
+          const KeyComparator &comparator,
+          page_id_t root_page_id)
     : index_name_(name), root_page_id_(root_page_id),
       buffer_pool_manager_(buffer_pool_manager), comparator_(comparator) {}
 
 /*
  * Helper function to decide whether current b+tree is empty
  */
-INDEX_TEMPLATE_ARGUMENTS
-bool BPLUSTREE_TYPE::IsEmpty() const { return true; }
+template <typename KeyType, typename ValueType, typename KeyComparator>
+bool BPlusTree<KeyType, ValueType, KeyComparator>::
+IsEmpty() const { return true; }
 
 /*****************************************************************************
  * SEARCH
@@ -34,10 +36,10 @@ bool BPLUSTREE_TYPE::IsEmpty() const { return true; }
  * This method is used for point query
  * @return : true means key exists
  */
-INDEX_TEMPLATE_ARGUMENTS
-bool BPLUSTREE_TYPE::GetValue(const KeyType &key,
-                              std::vector<ValueType> &result,
-                              Transaction *transaction) {
+template <typename KeyType, typename ValueType, typename KeyComparator>
+bool BPlusTree<KeyType, ValueType, KeyComparator>::
+GetValue(const KeyType &key, std::vector<ValueType> &result,
+         Transaction *transaction) {
   return false;
 }
 
@@ -51,19 +53,23 @@ bool BPLUSTREE_TYPE::GetValue(const KeyType &key,
  * @return: since we only support unique key, if user try to insert duplicate
  * keys return false, otherwise return true.
  */
-INDEX_TEMPLATE_ARGUMENTS
-bool BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value,
-                            Transaction *transaction) {
+template <typename KeyType, typename ValueType, typename KeyComparator>
+bool BPlusTree<KeyType, ValueType, KeyComparator>::
+Insert(const KeyType &key, const ValueType &value, Transaction *transaction) {
   return false;
 }
+
 /*
  * Insert constant key & value pair into an empty tree
  * User needs to first ask for new page from buffer pool manager(NOTICE: throw
  * an "out of memory" exception if returned value is nullptr), then update b+
  * tree's root page id and insert entry directly into leaf page.
  */
-INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::StartNewTree(const KeyType &key, const ValueType &value) {}
+template <typename KeyType, typename ValueType, typename KeyComparator>
+void BPlusTree<KeyType, ValueType, KeyComparator>::
+StartNewTree(const KeyType &key, const ValueType &value) {
+
+}
 
 /*
  * Insert constant key & value pair into leaf page
@@ -73,9 +79,9 @@ void BPLUSTREE_TYPE::StartNewTree(const KeyType &key, const ValueType &value) {}
  * @return: since we only support unique key, if user try to insert duplicate
  * keys return false, otherwise return true.
  */
-INDEX_TEMPLATE_ARGUMENTS
-bool BPLUSTREE_TYPE::InsertIntoLeaf(const KeyType &key, const ValueType &value,
-                                    Transaction *transaction) {
+template <typename KeyType, typename ValueType, typename KeyComparator>
+bool BPlusTree<KeyType, ValueType, KeyComparator>::
+InsertIntoLeaf(const KeyType &key, const ValueType &value, Transaction *transaction) {
   return false;
 }
 
@@ -86,8 +92,9 @@ bool BPLUSTREE_TYPE::InsertIntoLeaf(const KeyType &key, const ValueType &value,
  * an "out of memory" exception if returned value is nullptr), then move half
  * of key & value pairs from input page to newly created page
  */
-INDEX_TEMPLATE_ARGUMENTS
-template <typename N> N *BPLUSTREE_TYPE::Split(N *node) { return nullptr; }
+template <typename KeyType, typename ValueType, typename KeyComparator>
+template <typename N> N *BPlusTree<KeyType, ValueType, KeyComparator>::
+Split(N *node) { return nullptr; }
 
 /*
  * Insert key & value pair into internal page after split
@@ -98,11 +105,12 @@ template <typename N> N *BPLUSTREE_TYPE::Split(N *node) { return nullptr; }
  * adjusted to take info of new_node into account. Remember to deal with split
  * recursively if necessary.
  */
-INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::InsertIntoParent(BPlusTreePage *old_node,
-                                      const KeyType &key,
-                                      BPlusTreePage *new_node,
-                                      Transaction *transaction) {}
+template <typename KeyType, typename ValueType, typename KeyComparator>
+void BPlusTree<KeyType, ValueType, KeyComparator>::
+InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
+                 BPlusTreePage *new_node, Transaction *transaction) {
+
+}
 
 /*****************************************************************************
  * REMOVE
@@ -114,8 +122,11 @@ void BPLUSTREE_TYPE::InsertIntoParent(BPlusTreePage *old_node,
  * delete entry from leaf page. Remember to deal with redistribute or merge if
  * necessary.
  */
-INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {}
+template <typename KeyType, typename ValueType, typename KeyComparator>
+void BPlusTree<KeyType, ValueType, KeyComparator>::
+Remove(const KeyType &key, Transaction *transaction) {
+
+}
 
 /*
  * User needs to first find the sibling of input page. If sibling's size + input
@@ -124,9 +135,10 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {}
  * @return: true means target leaf page should be deleted, false means no
  * deletion happens
  */
-INDEX_TEMPLATE_ARGUMENTS
+template <typename KeyType, typename ValueType, typename KeyComparator>
 template <typename N>
-bool BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) {
+bool BPlusTree<KeyType, ValueType, KeyComparator>::
+CoalesceOrRedistribute(N *node, Transaction *transaction) {
   return false;
 }
 
@@ -142,12 +154,12 @@ bool BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) {
  * @return  true means parent node should be deleted, false means no deletion
  * happend
  */
-INDEX_TEMPLATE_ARGUMENTS
+template <typename KeyType, typename ValueType, typename KeyComparator>
 template <typename N>
-bool BPLUSTREE_TYPE::Coalesce(
-    N *&neighbor_node, N *&node,
-    BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *&parent,
-    int index, Transaction *transaction) {
+bool BPlusTree<KeyType, ValueType, KeyComparator>::
+Coalesce(N *&neighbor_node, N *&node,
+         BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *&parent,
+         int index, Transaction *transaction) {
   return false;
 }
 
@@ -160,9 +172,13 @@ bool BPLUSTREE_TYPE::Coalesce(
  * @param   neighbor_node      sibling page of input "node"
  * @param   node               input from method coalesceOrRedistribute()
  */
-INDEX_TEMPLATE_ARGUMENTS
+template <typename KeyType, typename ValueType, typename KeyComparator>
 template <typename N>
-void BPLUSTREE_TYPE::Redistribute(N *neighbor_node, N *node, int index) {}
+void BPlusTree<KeyType, ValueType, KeyComparator>::
+Redistribute(N *neighbor_node, N *node, int index) {
+
+}
+
 /*
  * Update root page if necessary
  * NOTE: size of root page can be less than min size and this method is only
@@ -173,8 +189,9 @@ void BPLUSTREE_TYPE::Redistribute(N *neighbor_node, N *node, int index) {}
  * @return : true means root page should be deleted, false means no deletion
  * happend
  */
-INDEX_TEMPLATE_ARGUMENTS
-bool BPLUSTREE_TYPE::AdjustRoot(BPlusTreePage *old_root_node) {
+template <typename KeyType, typename ValueType, typename KeyComparator>
+bool BPlusTree<KeyType, ValueType, KeyComparator>::
+AdjustRoot(BPlusTreePage *old_root_node) {
   return false;
 }
 
@@ -186,16 +203,18 @@ bool BPLUSTREE_TYPE::AdjustRoot(BPlusTreePage *old_root_node) {
  * index iterator
  * @return : index iterator
  */
-INDEX_TEMPLATE_ARGUMENTS
-INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin() { return INDEXITERATOR_TYPE(); }
+template <typename KeyType, typename ValueType, typename KeyComparator>
+INDEXITERATOR_TYPE BPlusTree<KeyType, ValueType, KeyComparator>::
+Begin() { return INDEXITERATOR_TYPE(); }
 
 /*
  * Input parameter is low key, find the leaf page that contains the input key
  * first, then construct index iterator
  * @return : index iterator
  */
-INDEX_TEMPLATE_ARGUMENTS
-INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin(const KeyType &key) {
+template <typename KeyType, typename ValueType, typename KeyComparator>
+INDEXITERATOR_TYPE BPlusTree<KeyType, ValueType, KeyComparator>::
+Begin(const KeyType &key) {
   return INDEXITERATOR_TYPE();
 }
 
@@ -206,9 +225,9 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin(const KeyType &key) {
  * Find leaf page containing particular key, if leftMost flag == true, find
  * the left most leaf page
  */
-INDEX_TEMPLATE_ARGUMENTS
-B_PLUS_TREE_LEAF_PAGE_TYPE *BPLUSTREE_TYPE::FindLeafPage(const KeyType &key,
-                                                         bool leftMost) {
+template <typename KeyType, typename ValueType, typename KeyComparator>
+B_PLUS_TREE_LEAF_PAGE_TYPE *BPlusTree<KeyType, ValueType, KeyComparator>::
+FindLeafPage(const KeyType &key, bool leftMost) {
   return nullptr;
 }
 
@@ -220,8 +239,9 @@ B_PLUS_TREE_LEAF_PAGE_TYPE *BPLUSTREE_TYPE::FindLeafPage(const KeyType &key,
  * insert a record <index_name, root_page_id> into header page instead of
  * updating it.
  */
-INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::UpdateRootPageId(int insert_record) {
+template <typename KeyType, typename ValueType, typename KeyComparator>
+void BPlusTree<KeyType, ValueType, KeyComparator>::
+UpdateRootPageId(int insert_record) {
   HeaderPage *header_page = static_cast<HeaderPage *>(
       buffer_pool_manager_->FetchPage(HEADER_PAGE_ID));
   if (insert_record)
@@ -237,16 +257,17 @@ void BPLUSTREE_TYPE::UpdateRootPageId(int insert_record) {
  * This method is used for debug only
  * print out whole b+tree sturcture, rank by rank
  */
-INDEX_TEMPLATE_ARGUMENTS
-std::string BPLUSTREE_TYPE::ToString(bool verbose) { return "Empty tree"; }
+template <typename KeyType, typename ValueType, typename KeyComparator>
+std::string BPlusTree<KeyType, ValueType, KeyComparator>::
+ToString(bool verbose) { return "Empty tree"; }
 
 /*
  * This method is used for test only
  * Read data from file and insert one by one
  */
-INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::InsertFromFile(const std::string &file_name,
-                                    Transaction *transaction) {
+template <typename KeyType, typename ValueType, typename KeyComparator>
+void BPlusTree<KeyType, ValueType, KeyComparator>::
+InsertFromFile(const std::string &file_name, Transaction *transaction) {
   int64_t key;
   std::ifstream input(file_name);
   while (input) {
@@ -262,9 +283,9 @@ void BPLUSTREE_TYPE::InsertFromFile(const std::string &file_name,
  * This method is used for test only
  * Read data from file and remove one by one
  */
-INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::RemoveFromFile(const std::string &file_name,
-                                    Transaction *transaction) {
+template <typename KeyType, typename ValueType, typename KeyComparator>
+void BPlusTree<KeyType, ValueType, KeyComparator>::
+RemoveFromFile(const std::string &file_name, Transaction *transaction) {
   int64_t key;
   std::ifstream input(file_name);
   while (input) {
