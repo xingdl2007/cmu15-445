@@ -41,36 +41,7 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 bool BPlusTree<KeyType, ValueType, KeyComparator>::
 GetValue(const KeyType &key, std::vector<ValueType> &result,
          Transaction *transaction) {
-  // empty?
-  if (IsEmpty()) {
-    return false;
-  }
-  auto *node = reinterpret_cast<BPlusTreePage *>(
-      buffer_pool_manager_->FetchPage(root_page_id_));
-
-  // no buffer?
-  if (node == nullptr) {
-    return false;
-  }
-
-  // find the leaf node
-  while (node->IsLeafPage()) {
-    auto internal = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>(node);
-    page_id_t next = internal->Lookup(key, comparator_);
-
-    node = reinterpret_cast<BPlusTreePage *>(
-        buffer_pool_manager_->FetchPage(next));
-
-    // if no buffer, return immediately
-    if (node == nullptr) {
-      return false;
-    }
-
-    // necessary?
-    buffer_pool_manager_->UnpinPage(node->GetPageId(), false);
-  }
-
-  auto *leaf = reinterpret_cast<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *>(node);
+  auto *leaf = FindLeafPage(key, false);
   ValueType value;
   if (leaf->Lookup(key, value, comparator_)) {
     result.push_back(value);
@@ -488,13 +459,17 @@ AdjustRoot(BPlusTreePage *old_root_node) {
  * INDEX ITERATOR
  *****************************************************************************/
 /*
- * Input parameter is void, find the leaftmost leaf page first, then construct
+ * Input parameter is void, find the leftmost leaf page first, then construct
  * index iterator
  * @return : index iterator
  */
 template <typename KeyType, typename ValueType, typename KeyComparator>
-INDEXITERATOR_TYPE BPlusTree<KeyType, ValueType, KeyComparator>::
-Begin() { return INDEXITERATOR_TYPE(); }
+IndexIterator<KeyType, ValueType, KeyComparator> BPlusTree<KeyType, ValueType, KeyComparator>::
+Begin() {
+  KeyType key;
+  return IndexIterator<KeyType, ValueType, KeyComparator>(
+      FindLeafPage(key, true), buffer_pool_manager_);
+}
 
 /*
  * Input parameter is low key, find the leaf page that contains the input key
@@ -502,9 +477,10 @@ Begin() { return INDEXITERATOR_TYPE(); }
  * @return : index iterator
  */
 template <typename KeyType, typename ValueType, typename KeyComparator>
-INDEXITERATOR_TYPE BPlusTree<KeyType, ValueType, KeyComparator>::
+IndexIterator<KeyType, ValueType, KeyComparator> BPlusTree<KeyType, ValueType, KeyComparator>::
 Begin(const KeyType &key) {
-  return INDEXITERATOR_TYPE();
+  return IndexIterator<KeyType, ValueType, KeyComparator>(
+      FindLeafPage(key, true), buffer_pool_manager_);
 }
 
 /*****************************************************************************
@@ -515,9 +491,40 @@ Begin(const KeyType &key) {
  * the left most leaf page
  */
 template <typename KeyType, typename ValueType, typename KeyComparator>
-B_PLUS_TREE_LEAF_PAGE_TYPE *BPlusTree<KeyType, ValueType, KeyComparator>::
+BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *
+BPlusTree<KeyType, ValueType, KeyComparator>::
 FindLeafPage(const KeyType &key, bool leftMost) {
-  return nullptr;
+  // empty?
+  if (IsEmpty()) {
+    return nullptr;
+  }
+  auto *node = reinterpret_cast<BPlusTreePage *>(
+      buffer_pool_manager_->FetchPage(root_page_id_));
+
+  // no buffer?
+  if (node == nullptr) {
+    return nullptr;
+  }
+
+  // find the leaf node
+  while (!node->IsLeafPage()) {
+    auto internal = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>(node);
+    page_id_t next;
+
+    if (leftMost) {
+      next = internal->ValueAt(0);
+    } else {
+      next = internal->Lookup(key, comparator_);
+    }
+
+    node = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(next));
+    // if no buffer, return immediately
+    if (node == nullptr) {
+      return nullptr;
+    }
+    buffer_pool_manager_->UnpinPage(node->GetPageId(), false);
+  }
+  return reinterpret_cast<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *>(node);
 }
 
 /*
@@ -549,7 +556,9 @@ UpdateRootPageId(bool insert_record) {
  */
 template <typename KeyType, typename ValueType, typename KeyComparator>
 std::string BPlusTree<KeyType, ValueType, KeyComparator>::
-ToString(bool verbose) { return "Empty tree"; }
+ToString(bool verbose) {
+  return "Empty tree";
+}
 
 /*
  * This method is used for test only

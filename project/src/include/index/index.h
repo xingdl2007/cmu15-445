@@ -45,7 +45,7 @@ public:
   // Return the number of columns inside index key (not in tuple key)
   // Note that this must be defined inside the cpp source file
   // because it uses the member of catalog::Schema which is not known here
-  int GetIndexColumnCount() const { return (int)key_attrs_.size(); }
+  int GetIndexColumnCount() const { return (int) key_attrs_.size(); }
 
   //  Returns the mapping relation between indexed columns  and base table
   //  columns
