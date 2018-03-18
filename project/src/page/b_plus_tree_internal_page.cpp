@@ -175,19 +175,6 @@ MoveHalfTo(BPlusTreeInternalPage *recipient,
   auto half = GetSize()/2;
   recipient->CopyHalfFrom(array + GetSize() - half, half, buffer_pool_manager);
   IncreaseSize(-1*half);
-
-  // promote recipient's first key to parent
-  KeyType split = recipient->KeyAt(0);
-
-  // parent of current internal page
-  auto parent = reinterpret_cast<BPlusTreeInternalPage *>(
-      buffer_pool_manager->FetchPage(GetParentPageId()));
-
-  // insert to parent, after the original pointer
-  parent->InsertNodeAfter(GetPageId(), split, recipient->GetPageId());
-
-  // unpin when done, set dirty flag
-  buffer_pool_manager->UnpinPage(parent->GetPageId(), true);
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>

@@ -144,7 +144,7 @@ void BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>::
 MoveHalfTo(BPlusTreeLeafPage *recipient,
            __attribute__((unused)) BufferPoolManager *buffer_pool_manager) {
   // at least have some key-value pairs
-  assert(GetSize());
+  assert(GetSize() > 0);
 
   int size = GetSize()/2;
   MappingType *src = array + GetSize() - size;

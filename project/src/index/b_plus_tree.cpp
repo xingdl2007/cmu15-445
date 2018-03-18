@@ -140,11 +140,11 @@ InsertIntoLeaf(const KeyType &key, const ValueType &value, Transaction *transact
         (node)->Lookup(key, comparator_);
 
     buffer_pool_manager_->UnpinPage(node->GetPageId(), false);
-
     node = reinterpret_cast<BPlusTreePage *>(
         buffer_pool_manager_->FetchPage(child_page_id));
   }
 
+  // find the leaf node
   auto leaf = reinterpret_cast<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *>(node);
   if (leaf->GetSize() < leaf->GetMaxSize()) {
     ValueType v;
@@ -155,6 +155,7 @@ InsertIntoLeaf(const KeyType &key, const ValueType &value, Transaction *transact
   } else {
     // split
     auto *leaf2 = Split<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>(leaf);
+
     if (comparator_(key, leaf2->KeyAt(0)) < 0) {
       leaf->Insert(key, value, comparator_);
     } else {
@@ -162,8 +163,7 @@ InsertIntoLeaf(const KeyType &key, const ValueType &value, Transaction *transact
     }
     InsertIntoParent(leaf, leaf2->KeyAt(0), leaf2, transaction);
   }
-
-  return false;
+  return true;
 }
 
 /*
@@ -176,7 +176,13 @@ InsertIntoLeaf(const KeyType &key, const ValueType &value, Transaction *transact
 template <typename KeyType, typename ValueType, typename KeyComparator>
 template <typename N> N *BPlusTree<KeyType, ValueType, KeyComparator>::
 Split(N *node) {
-  return nullptr;
+  page_id_t page_id;
+  auto new_node = reinterpret_cast<N *>(buffer_pool_manager_->NewPage(page_id));
+  if (new_node == nullptr) {
+    throw std::bad_alloc();
+  }
+  node->MoveHalfTo(new_node, buffer_pool_manager_);
+  return new_node;
 }
 
 /*
@@ -192,7 +198,47 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 void BPlusTree<KeyType, ValueType, KeyComparator>::
 InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
                  BPlusTreePage *new_node, Transaction *transaction) {
+  if (old_node->IsRootPage()) {
+    auto root = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>
+    (buffer_pool_manager_->NewPage(root_page_id_));
+    if (root == nullptr) {
+      throw std::bad_alloc();
+    }
+    root->PopulateNewRoot(old_node->GetPageId(), key, new_node->GetPageId());
 
+    old_node->SetParentPageId(root_page_id_);
+    new_node->SetParentPageId(root_page_id_);
+
+    // update to new 'root_page_id'
+    UpdateRootPageId(false);
+  } else {
+    auto internal =
+        reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>
+        (buffer_pool_manager_->FetchPage(old_node->GetParentPageId()));
+
+    if (internal == nullptr) {
+      throw std::bad_alloc();
+    }
+
+    if (internal->GetSize() < internal->GetMaxSize()) {
+      internal->InsertNodeAfter(old_node->GetPageId(), key, new_node->GetPageId());
+      // set ParentPageID
+      new_node->SetParentPageId(internal->GetPageId());
+    } else {
+      // split
+      auto internal2 =
+          Split<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>>(internal);
+
+      if (comparator_(key, internal2->KeyAt(0)) < 0) {
+        internal->InsertNodeAfter(old_node->GetPageId(), key, new_node->GetPageId());
+        new_node->SetParentPageId(internal->GetPageId());
+      } else {
+        internal2->InsertNodeAfter(old_node->GetPageId(), key, new_node->GetPageId());
+        new_node->SetParentPageId(internal2->GetPageId());
+      }
+      InsertIntoParent(internal, internal2->KeyAt(0), internal2);
+    }
+  }
 }
 
 /*****************************************************************************
