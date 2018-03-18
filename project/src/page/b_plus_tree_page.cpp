@@ -15,8 +15,7 @@ bool BPlusTreePage::IsLeafPage() const {
 
 // only root has no parent
 bool BPlusTreePage::IsRootPage() const {
-  return page_type_ == IndexPageType::INTERNAL_PAGE &&
-      parent_page_id_ == INVALID_PAGE_ID;
+  return parent_page_id_ == INVALID_PAGE_ID;
 }
 
 void BPlusTreePage::SetPageType(IndexPageType page_type) {

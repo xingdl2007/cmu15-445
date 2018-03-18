@@ -134,12 +134,16 @@ InsertIntoLeaf(const KeyType &key, const ValueType &value, Transaction *transact
   auto node = reinterpret_cast<BPlusTreePage *>(
       buffer_pool_manager_->FetchPage(root_page_id_));
 
+  assert(node->IsRootPage());
+
   while (!node->IsLeafPage()) {
     auto child_page_id =
         reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>
         (node)->Lookup(key, comparator_);
 
+    // unpin when we are done
     buffer_pool_manager_->UnpinPage(node->GetPageId(), false);
+
     node = reinterpret_cast<BPlusTreePage *>(
         buffer_pool_manager_->FetchPage(child_page_id));
   }
@@ -152,6 +156,7 @@ InsertIntoLeaf(const KeyType &key, const ValueType &value, Transaction *transact
       return false;
     }
     leaf->Insert(key, value, comparator_);
+    buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
   } else {
     // split
     auto *leaf2 = Split<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>(leaf);
@@ -211,6 +216,12 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
 
     // update to new 'root_page_id'
     UpdateRootPageId(false);
+
+    buffer_pool_manager_->UnpinPage(old_node->GetPageId(), true);
+    buffer_pool_manager_->UnpinPage(new_node->GetPageId(), true);
+
+    // root is also done
+    buffer_pool_manager_->UnpinPage(root->GetPageId(), true);
   } else {
     auto internal =
         reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>
@@ -224,6 +235,13 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
       internal->InsertNodeAfter(old_node->GetPageId(), key, new_node->GetPageId());
       // set ParentPageID
       new_node->SetParentPageId(internal->GetPageId());
+
+      // new_node is split from old_node, must be dirty
+      buffer_pool_manager_->UnpinPage(old_node->GetPageId(), true);
+      buffer_pool_manager_->UnpinPage(new_node->GetPageId(), true);
+
+      // internal is also done
+      buffer_pool_manager_->UnpinPage(internal->GetPageId(), true);
     } else {
       // split
       auto internal2 =
@@ -236,6 +254,11 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
         internal2->InsertNodeAfter(old_node->GetPageId(), key, new_node->GetPageId());
         new_node->SetParentPageId(internal2->GetPageId());
       }
+
+      buffer_pool_manager_->UnpinPage(old_node->GetPageId(), true);
+      buffer_pool_manager_->UnpinPage(new_node->GetPageId(), true);
+
+      // recursive
       InsertIntoParent(internal, internal2->KeyAt(0), internal2);
     }
   }
@@ -246,7 +269,7 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
  *****************************************************************************/
 /*
  * Delete key & value pair associated with input key
- * If current tree is empty, return immdiately.
+ * If current tree is empty, return immediately.
  * If not, User needs to first find the right leaf page as deletion target, then
  * delete entry from leaf page. Remember to deal with redistribute or merge if
  * necessary.
@@ -254,7 +277,51 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void BPlusTree<KeyType, ValueType, KeyComparator>::
 Remove(const KeyType &key, Transaction *transaction) {
+  if (IsEmpty()) {
+    return;
+  }
+  auto node = reinterpret_cast<BPlusTreePage *>(
+      buffer_pool_manager_->FetchPage(root_page_id_));
 
+  assert(node->IsRootPage());
+  while (!node->IsLeafPage()) {
+    auto child_page_id =
+        reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>
+        (node)->Lookup(key, comparator_);
+    // unpin when we are done
+    buffer_pool_manager_->UnpinPage(node->GetPageId(), false);
+    node = reinterpret_cast<BPlusTreePage *>(
+        buffer_pool_manager_->FetchPage(child_page_id));
+  }
+
+  // find the leaf node
+  auto leaf = reinterpret_cast<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *>(node);
+  leaf->RemoveAndDeleteRecord(key, comparator_);
+
+  // we are done if leaf node have at least min k-v pairs
+  if (leaf->GetSize() >= leaf->GetMinSize()) {
+    buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
+    return;
+  }
+
+  if (leaf->IsRootPage()) {
+    if (leaf->GetSize() != 0) {
+      // leaf is root, and not emtpy
+      buffer_pool_manager_->UnpinPage(root_page_id_, true);
+    } else {
+      // leaf is not, and empty
+      buffer_pool_manager_->UnpinPage(root_page_id_, false);
+      buffer_pool_manager_->DeletePage(root_page_id_);
+
+      root_page_id_ = INVALID_PAGE_ID;
+      UpdateRootPageId(false);
+    }
+  } else {
+    if (CoalesceOrRedistribute(leaf, transaction)) {
+      buffer_pool_manager_->UnpinPage(leaf->GetPageId(), false);
+      buffer_pool_manager_->DeletePage(leaf->GetPageId());
+    }
+  }
 }
 
 /*
@@ -268,7 +335,36 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 template <typename N>
 bool BPlusTree<KeyType, ValueType, KeyComparator>::
 CoalesceOrRedistribute(N *node, Transaction *transaction) {
-  return false;
+  // find sibling fist, always find the previous one
+  auto parent =
+      reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>
+      (buffer_pool_manager_->FetchPage(node->GetParentPageId()));
+
+  if (parent == nullptr) {
+    throw std::bad_alloc();
+  }
+  int value_index = parent->ValueIndex(node->GetPageId());
+  int sibling_page_id = parent->ValueAt(value_index - 1);
+
+  auto sibling = reinterpret_cast<N *>
+  (buffer_pool_manager_->FetchPage(sibling_page_id));
+
+  // redistribute
+  if (sibling->GetSize() + node->GetSize() > node->GetMaxSize()) {
+    Redistribute<N>(sibling, node, 1);
+    buffer_pool_manager_->UnpinPage(sibling->GetPageId(), true);
+    buffer_pool_manager_->UnpinPage(parent->GetPageId(), true);
+    return false;
+  }
+
+  // merge
+  if (Coalesce<N>(sibling, node, parent, value_index, transaction)) {
+    buffer_pool_manager_->DeletePage(parent->GetPageId());
+  } else {
+    buffer_pool_manager_->UnpinPage(parent->GetPageId(), true);
+  }
+  buffer_pool_manager_->UnpinPage(sibling->GetPageId(), true);
+  return true;
 }
 
 /*
@@ -289,6 +385,18 @@ bool BPlusTree<KeyType, ValueType, KeyComparator>::
 Coalesce(N *&neighbor_node, N *&node,
          BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *&parent,
          int index, Transaction *transaction) {
+
+  node->MoveAllTo(neighbor_node, index, buffer_pool_manager_);
+  parent->Remove(index);
+
+  if (parent->GetSize() < parent->GetMinSize()) {
+    if (CoalesceOrRedistribute(parent, transaction)) {
+      buffer_pool_manager_->UnpinPage(parent->GetPageId(), false);
+      buffer_pool_manager_->DeletePage(parent->GetPageId());
+    }
+    return true;
+  }
+  buffer_pool_manager_->UnpinPage(parent->GetPageId(), true);
   return false;
 }
 
@@ -305,7 +413,20 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 template <typename N>
 void BPlusTree<KeyType, ValueType, KeyComparator>::
 Redistribute(N *neighbor_node, N *node, int index) {
-
+  if (index == 0) {
+    neighbor_node->MoveFirstToEndOf(node, buffer_pool_manager_);
+  } else {
+    auto parent =
+        reinterpret_cast<BPlusTreeInternalPage<KeyType,
+                                               page_id_t,
+                                               KeyComparator> *>
+        (buffer_pool_manager_->FetchPage(node->GetParentPageId()));
+    if (parent == nullptr) {
+      throw std::bad_alloc();
+    }
+    int index = parent->ValueIndex(node->GetPageId());
+    neighbor_node->MoveLastToFrontOf(node, index, buffer_pool_manager_);
+  }
 }
 
 /*
@@ -321,6 +442,7 @@ Redistribute(N *neighbor_node, N *node, int index) {
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool BPlusTree<KeyType, ValueType, KeyComparator>::
 AdjustRoot(BPlusTreePage *old_root_node) {
+
   return false;
 }
 
