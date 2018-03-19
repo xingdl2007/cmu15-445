@@ -18,7 +18,7 @@ class IndexIterator {
 public:
   // you may define your own constructor based on your member variables
   IndexIterator(BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *,
-                BufferPoolManager *);
+                int, BufferPoolManager *);
 
   ~IndexIterator();
 
@@ -31,8 +31,8 @@ public:
 private:
   // add your own private member variables here
   BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *leaf_;
-  BufferPoolManager *buff_pool_manager_;
   int index_;
+  BufferPoolManager *buff_pool_manager_;
 };
 
 } // namespace cmudb

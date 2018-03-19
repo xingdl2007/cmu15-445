@@ -233,8 +233,12 @@ MoveAllTo(BPlusTreeInternalPage *recipient, int index_in_parent,
   // assumption: current page is at the right hand of recipient
   recipient->CopyAllFrom(array + 1, GetSize() - 1, buffer_pool_manager);
 
-  auto *parent = reinterpret_cast<BPlusTreeInternalPage *>(
-      buffer_pool_manager->FetchPage(GetParentPageId()));
+  auto *page = buffer_pool_manager->FetchPage(GetParentPageId());
+  if (page == nullptr) {
+    throw Exception(EXCEPTION_TYPE_INDEX,
+                    "all page are pinned while MoveAllTo");
+  }
+  auto *parent = reinterpret_cast<BPlusTreeInternalPage *>(page->GetData());
   parent->Remove(index_in_parent);
 
   // unpin parent page
@@ -277,8 +281,12 @@ void BPlusTreeInternalPage<KeyType, ValueType, KeyComparator>::
 CopyLastFrom(const MappingType &pair, BufferPoolManager *buffer_pool_manager) {
   assert(GetSize() + 1 < GetMaxSize());
 
-  auto parent = reinterpret_cast<BPlusTreeInternalPage *>(
-      buffer_pool_manager->FetchPage(GetParentPageId()));
+  auto *page = buffer_pool_manager->FetchPage(GetParentPageId());
+  if (page == nullptr) {
+    throw Exception(EXCEPTION_TYPE_INDEX,
+                    "all page are pinned while CopyLastFrom");
+  }
+  auto parent = reinterpret_cast<BPlusTreeInternalPage *>(page->GetData());
 
   auto index = parent->ValueIndex(GetPageId());
   auto key = parent->KeyAt(index + 1);
@@ -311,8 +319,12 @@ CopyFirstFrom(const MappingType &pair, int parent_index,
               BufferPoolManager *buffer_pool_manager) {
   assert(GetSize() + 1 < GetMaxSize());
 
-  auto parent = reinterpret_cast<BPlusTreeInternalPage *>(
-      buffer_pool_manager->FetchPage(GetParentPageId()));
+  auto *page = buffer_pool_manager->FetchPage(GetParentPageId());
+  if (page == nullptr) {
+    throw Exception(EXCEPTION_TYPE_INDEX,
+                    "all page are pinned while CopyFirstFrom");
+  }
+  auto parent = reinterpret_cast<BPlusTreeInternalPage *>(page->GetData());
 
   auto key = parent->KeyAt(parent_index);
 
@@ -334,9 +346,10 @@ QueueUpChildren(std::queue<BPlusTreePage *> *queue,
                 BufferPoolManager *buffer_pool_manager) {
   for (int i = 0; i < GetSize(); i++) {
     auto *page = buffer_pool_manager->FetchPage(array[i].second);
-    if (page == nullptr)
+    if (page == nullptr) {
       throw Exception(EXCEPTION_TYPE_INDEX,
                       "all page are pinned while printing");
+    }
     auto *node = reinterpret_cast<BPlusTreePage *>(page->GetData());
     queue->push(node);
   }

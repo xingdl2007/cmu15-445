@@ -33,12 +33,12 @@ TEST(BPlusTreeTests, InsertTest1) {
   // create and fetch header_page
   page_id_t page_id;
   auto header_page = bpm->NewPage(page_id);
-  (void)header_page;
+  (void) header_page;
 
   std::vector<int64_t> keys = {1, 2, 3, 4, 5};
   for (auto key : keys) {
     int64_t value = key & 0xFFFFFFFF;
-    rid.Set((int32_t)(key >> 32), value);
+    rid.Set((int32_t) (key >> 32), value);
     index_key.SetFromInteger(key);
     tree.Insert(index_key, rid, transaction);
   }
@@ -93,12 +93,12 @@ TEST(BPlusTreeTests, InsertTest2) {
   // create and fetch header_page
   page_id_t page_id;
   auto header_page = bpm->NewPage(page_id);
-  (void)header_page;
+  (void) header_page;
 
   std::vector<int64_t> keys = {5, 4, 3, 2, 1};
   for (auto key : keys) {
     int64_t value = key & 0xFFFFFFFF;
-    rid.Set((int32_t)(key >> 32), value);
+    rid.Set((int32_t) (key >> 32), value);
     index_key.SetFromInteger(key);
     tree.Insert(index_key, rid, transaction);
   }
@@ -165,12 +165,12 @@ TEST(BPlusTreeTests, DeleteTest1) {
   // create and fetch header_page
   page_id_t page_id;
   auto header_page = bpm->NewPage(page_id);
-  (void)header_page;
+  (void) header_page;
 
   std::vector<int64_t> keys = {1, 2, 3, 4, 5};
   for (auto key : keys) {
     int64_t value = key & 0xFFFFFFFF;
-    rid.Set((int32_t)(key >> 32), value);
+    rid.Set((int32_t) (key >> 32), value);
     index_key.SetFromInteger(key);
     tree.Insert(index_key, rid, transaction);
   }
@@ -246,12 +246,12 @@ TEST(BPlusTreeTests, DeleteTest2) {
   // create and fetch header_page
   page_id_t page_id;
   auto header_page = bpm->NewPage(page_id);
-  (void)header_page;
+  (void) header_page;
 
   std::vector<int64_t> keys = {1, 2, 3, 4, 5};
   for (auto key : keys) {
     int64_t value = key & 0xFFFFFFFF;
-    rid.Set((int32_t)(key >> 32), value);
+    rid.Set((int32_t) (key >> 32), value);
     index_key.SetFromInteger(key);
     tree.Insert(index_key, rid, transaction);
   }
@@ -326,7 +326,7 @@ TEST(BPlusTreeTests, ScaleTest) {
   // create and fetch header_page
   page_id_t page_id;
   auto header_page = bpm->NewPage(page_id);
-  (void)header_page;
+  (void) header_page;
 
   int64_t scale = 10000;
   std::vector<int64_t> keys;
@@ -336,7 +336,7 @@ TEST(BPlusTreeTests, ScaleTest) {
 
   for (auto key : keys) {
     int64_t value = key & 0xFFFFFFFF;
-    rid.Set((int32_t)(key >> 32), value);
+    rid.Set((int32_t) (key >> 32), value);
     index_key.SetFromInteger(key);
     tree.Insert(index_key, rid, transaction);
   }

@@ -6,6 +6,7 @@
 
 #include "common/exception.h"
 #include "common/rid.h"
+#include "common/logger.h"
 #include "page/b_plus_tree_leaf_page.h"
 #include "page/b_plus_tree_internal_page.h"
 
@@ -24,7 +25,7 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 void BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>::
 Init(page_id_t page_id, page_id_t parent_id) {
 // set page type
-  SetPageType(IndexPageType::INTERNAL_PAGE);
+  SetPageType(IndexPageType::LEAF_PAGE);
   // set current size: 1 for the first invalid key
   SetSize(0);
   // set page id
@@ -109,7 +110,7 @@ Insert(const KeyType &key, const ValueType &value,
   if (GetSize() == 0 || comparator(key, KeyAt(GetSize() - 1)) > 0) {
     array[GetSize()] = {key, value};
   } else if (comparator(key, array[0].first) < 0) {
-    memmove(array + 1, array, static_cast<size_t>(GetSize()));
+    memmove(array + 1, array, static_cast<size_t>(GetSize()*sizeof(MappingType)));
     array[0] = {key, value};
   } else {
     int low = 0, high = GetSize() - 1, mid;
@@ -124,12 +125,19 @@ Insert(const KeyType &key, const ValueType &value,
         assert(0);
       }
     }
-    memmove(array + high + 1, array + high, static_cast<size_t>(GetSize() - high));
+    memmove(array + high + 1, array + high,
+            static_cast<size_t>((GetSize() - high)*sizeof(MappingType)));
     array[high] = {key, value};
   }
 
   IncreaseSize(1);
   assert(GetSize() <= GetMaxSize());
+
+  // debug
+  //for (int i = 0; i < GetSize(); ++i) {
+  //  std::cerr << array[i].first << ": " << array[i].second;
+  //}
+  //std::cerr << std::endl;
   return GetSize();
 }
 
@@ -181,7 +189,7 @@ Lookup(const KeyType &key, ValueType &value,
   }
   // binary search
   int low = 0, high = GetSize() - 1, mid;
-  while (low < high) {
+  while (low <= high) {
     mid = low + (high - low)/2;
     if (comparator(key, KeyAt(mid)) > 0) {
       low = mid + 1;
@@ -223,7 +231,7 @@ RemoveAndDeleteRecord(const KeyType &key, const KeyComparator &comparator) {
     } else {
       // delete
       memmove(array + mid, array + mid + 1,
-              static_cast<size_t>(GetSize() - mid - 1));
+              static_cast<size_t>((GetSize() - mid - 1)*sizeof(MappingType)));
       IncreaseSize(-1);
       break;
     }
@@ -268,16 +276,19 @@ MoveFirstToEndOf(BPlusTreeLeafPage *recipient,
                  BufferPoolManager *buffer_pool_manager) {
   MappingType pair = GetItem(0);
   IncreaseSize(-1);
-  memmove(array, array + 1, static_cast<size_t>(GetSize()));
+  memmove(array, array + 1, static_cast<size_t>(GetSize()*sizeof(MappingType)));
 
   recipient->CopyLastFrom(pair);
 
+  auto *page = buffer_pool_manager->FetchPage(GetParentPageId());
+  if (page == nullptr) {
+    throw Exception(EXCEPTION_TYPE_INDEX,
+                    "all page are pinned while MoveFirstToEndOf");
+  }
   // update relevant key & value pair in parent
   auto parent =
-      reinterpret_cast<BPlusTreeInternalPage<KeyType,
-                                             decltype(GetPageId()),
-                                             KeyComparator> *>
-      (buffer_pool_manager->FetchPage(GetParentPageId()));
+      reinterpret_cast<BPlusTreeInternalPage<KeyType, decltype(GetPageId()),
+                                             KeyComparator> *>(page->GetData());
 
   // replace key in parent with the moving one
   parent->SetKeyAt(parent->ValueIndex(GetPageId()), pair.first);
@@ -312,16 +323,19 @@ void BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>::
 CopyFirstFrom(const MappingType &item, int parentIndex,
               BufferPoolManager *buffer_pool_manager) {
   assert(GetSize() + 1 < GetMaxSize());
-  memmove(array + 1, array, GetSize());
+  memmove(array + 1, array, GetSize()*sizeof(MappingType));
   IncreaseSize(1);
   array[0] = item;
 
+  auto *page = buffer_pool_manager->FetchPage(GetParentPageId());
+  if (page == nullptr) {
+    throw Exception(EXCEPTION_TYPE_INDEX,
+                    "all page are pinned while CopyFirstFrom");
+  }
   // get parent
   auto parent =
-      reinterpret_cast<BPlusTreeInternalPage<KeyType,
-                                             decltype(GetPageId()),
-                                             KeyComparator> *>
-      (buffer_pool_manager->FetchPage(GetParentPageId()));
+      reinterpret_cast<BPlusTreeInternalPage<KeyType, decltype(GetPageId()),
+                                             KeyComparator> *>(page->GetData());
 
   // replace with moving key
   parent->SetKeyAt(parentIndex, item.first);
