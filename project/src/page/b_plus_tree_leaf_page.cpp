@@ -158,6 +158,9 @@ MoveHalfTo(BPlusTreeLeafPage *recipient,
   MappingType *src = array + GetSize() - size;
   recipient->CopyHalfFrom(src, size);
   IncreaseSize(-1*size);
+
+  // chain together
+  SetNextPageId(recipient->GetPageId());
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
@@ -222,7 +225,7 @@ RemoveAndDeleteRecord(const KeyType &key, const KeyComparator &comparator) {
 
   // binary search
   int low = 0, high = GetSize() - 1, mid;
-  while (low < high) {
+  while (low <= high) {
     mid = low + (high - low)/2;
     if (comparator(key, KeyAt(mid)) > 0) {
       low = mid + 1;
@@ -356,7 +359,7 @@ ToString(bool verbose) const {
   std::ostringstream stream;
   if (verbose) {
     stream << "[pageId: " << GetPageId() << " parentId: " << GetParentPageId()
-           << "]<" << GetSize() << "> ";
+           << "] <size: " << GetSize() << ", max: " << GetMaxSize() << "> ";
   }
   int entry = 0;
   int end = GetSize();
@@ -370,9 +373,10 @@ ToString(bool verbose) const {
     }
     stream << std::dec << array[entry].first;
     if (verbose) {
-      stream << "(" << array[entry].second << ")";
+      stream << " (" << array[entry].second << ")";
     }
     ++entry;
+    stream << " ";
   }
   return stream.str();
 }

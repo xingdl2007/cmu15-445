@@ -79,6 +79,17 @@ ValueAt(int index) const {
   return array[index].second;
 }
 
+/*
+ * Helper method to get the value associated with input "index"(a.k.a array
+ * offset)
+ */
+template <typename KeyType, typename ValueType, typename KeyComparator>
+void BPlusTreeInternalPage<KeyType, ValueType, KeyComparator>::
+SetValueAt(int index, const ValueType &value) {
+  assert(0 <= index && index < GetSize());
+  array[index].second = value;
+}
+
 /*****************************************************************************
  * LOOKUP
  *****************************************************************************/
@@ -172,7 +183,7 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 void BPlusTreeInternalPage<KeyType, ValueType, KeyComparator>::
 MoveHalfTo(BPlusTreeInternalPage *recipient,
            BufferPoolManager *buffer_pool_manager) {
-  auto half = GetSize()/2;
+  auto half = (GetSize() + 1)/2;
   recipient->CopyHalfFrom(array + GetSize() - half, half, buffer_pool_manager);
   IncreaseSize(-1*half);
 }
@@ -182,11 +193,11 @@ void BPlusTreeInternalPage<KeyType, ValueType, KeyComparator>::
 CopyHalfFrom(MappingType *items, int size,
              BufferPoolManager *buffer_pool_manager) {
   // must be a new page
-  assert(!IsLeafPage() && GetSize() == 1);
+  assert(!IsLeafPage() && GetSize() == 1 && size > 0);
   for (int i = 0; i < size; ++i) {
     array[i] = *items++;
   }
-  IncreaseSize(size);
+  IncreaseSize(size - 1);
 }
 
 /*****************************************************************************
@@ -364,9 +375,9 @@ ToString(bool verbose) const {
   std::ostringstream os;
   if (verbose) {
     os << "[pageId: " << GetPageId() << " parentId: "
-       << GetParentPageId() << "]<" << GetSize() << "> ";
+       << GetParentPageId() << "] <size: " << GetSize()
+       << ", max: " << GetMaxSize() << "> ";
   }
-
   int entry = verbose ? 0 : 1;
   int end = GetSize();
   bool first = true;
@@ -381,6 +392,7 @@ ToString(bool verbose) const {
       os << "(" << array[entry].second << ")";
     }
     ++entry;
+    os << " ";
   }
   return os.str();
 }
