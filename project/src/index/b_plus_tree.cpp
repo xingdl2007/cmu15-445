@@ -119,7 +119,13 @@ InsertIntoLeaf(const KeyType &key, const ValueType &value, Transaction *transact
     }
     leaf->Insert(key, value, comparator_);
     buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
+
   } else {
+    // when leaf node can hold even number of key-value pairs
+    // the following method is ok, but if the leaf node can hold
+    // odd number of pairs, the folling split method may uneven
+    // one child may have two more pairs than the other which shoud
+    // be equal.
     auto *leaf2 = Split<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>(leaf);
     if (comparator_(key, leaf2->KeyAt(0)) < 0) {
       leaf->Insert(key, value, comparator_);
@@ -135,9 +141,10 @@ InsertIntoLeaf(const KeyType &key, const ValueType &value, Transaction *transact
       leaf2->SetNextPageId(leaf->GetPageId());
     }
 
+    // insert the split key into parent
     InsertIntoParent(leaf, leaf2->KeyAt(0), leaf2, transaction);
 
-    // Unpin when we are done
+    // unpin when we are done
     buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
     buffer_pool_manager_->UnpinPage(leaf2->GetPageId(), true);
   }
@@ -189,7 +196,6 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
     auto root =
         reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t,
                                                KeyComparator> *>(page->GetData());
-
     root->Init(root_page_id_);
     root->PopulateNewRoot(old_node->GetPageId(), key, new_node->GetPageId());
 
@@ -204,6 +210,7 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
 
     // root is also done
     buffer_pool_manager_->UnpinPage(root->GetPageId(), true);
+
   } else {
     auto *page = buffer_pool_manager_->FetchPage(old_node->GetParentPageId());
     if (page == nullptr) {
@@ -213,7 +220,7 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
     auto internal =
         reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t,
                                                KeyComparator> *>(page->GetData());
-
+    // internal node have space to take new pair
     if (internal->GetSize() < internal->GetMaxSize()) {
       internal->InsertNodeAfter(old_node->GetPageId(), key, new_node->GetPageId());
       // set ParentPageID
@@ -225,16 +232,22 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
 
       // internal is also done
       buffer_pool_manager_->UnpinPage(internal->GetPageId(), true);
+
     } else {
-      // first make a copy of internal node, simplify split
+      // internal have no space and have to split
+      // first make a copy of internal node, simplify split process
       page_id_t page_id;
       auto *page = buffer_pool_manager_->NewPage(page_id);
       if (page == nullptr) {
         throw Exception(EXCEPTION_TYPE_INDEX,
                         "all page are pinned while InsertIntoParent");
       }
-      auto *copy = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t,
-                                                          KeyComparator> *>(page->GetData());
+
+      // copy will contain all internal node's pair excluding the first one
+      // and plus the new one [key,value] which must be at the right position
+      auto *copy =
+          reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t,
+                                                 KeyComparator> *>(page->GetData());
       copy->Init(page_id);
       copy->SetSize(internal->GetSize());
       for (int i = 1, j = 0; i <= internal->GetSize(); ++i, ++j) {
@@ -243,30 +256,26 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
           copy->SetValueAt(j, new_node->GetPageId());
           ++j;
         }
-        // not the end
+        // the last one
         if (i < internal->GetSize()) {
           copy->SetKeyAt(j, internal->KeyAt(i));
           copy->SetValueAt(j, internal->ValueAt(i));
         }
       }
 
-      // debug
-      //std::cerr << key << " " << new_node->GetPageId() << std::endl;
-      //for (int i = 0; i < internal->GetSize(); ++i) {
-      //  std::cerr << internal->KeyAt(i) << " " << internal->ValueAt(i) <<
-      //            "->" << copy->KeyAt(i) << " " << copy->ValueAt(i) << std::endl;
-      //}
-
-      // a little wired
+      // `internal2` will move GetSize()+1)/2 pairs from `copy`
       assert(copy->GetSize() == copy->GetMaxSize());
       auto internal2 =
           Split<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>>(copy);
 
+      // `internal` have to copy back all pairs from `copy` start with index 1
+      // the left most pointer remain unchanged
       internal->SetSize(copy->GetSize() + 1);
       for (int i = 0; i < copy->GetSize(); ++i) {
         internal->SetKeyAt(i + 1, copy->KeyAt(i));
         internal->SetValueAt(i + 1, copy->ValueAt(i));
       }
+
       // set new node's parent page id
       if (comparator_(key, internal2->KeyAt(0)) < 0) {
         new_node->SetParentPageId(internal->GetPageId());
@@ -275,6 +284,7 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
         old_node->SetParentPageId(internal2->GetPageId());
       }
 
+      // old_node and new_node is done, unpin thems
       buffer_pool_manager_->UnpinPage(old_node->GetPageId(), true);
       buffer_pool_manager_->UnpinPage(new_node->GetPageId(), true);
 
@@ -282,7 +292,7 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
       buffer_pool_manager_->UnpinPage(copy->GetPageId(), false);
       buffer_pool_manager_->DeletePage(copy->GetPageId());
 
-      // recursive
+      // recursive call until root if necessary
       InsertIntoParent(internal, internal2->KeyAt(0), internal2);
     }
   }

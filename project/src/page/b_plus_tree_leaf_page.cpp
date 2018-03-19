@@ -132,12 +132,6 @@ Insert(const KeyType &key, const ValueType &value,
 
   IncreaseSize(1);
   assert(GetSize() <= GetMaxSize());
-
-  // debug
-  //for (int i = 0; i < GetSize(); ++i) {
-  //  std::cerr << array[i].first << ": " << array[i].second;
-  //}
-  //std::cerr << std::endl;
   return GetSize();
 }
 
