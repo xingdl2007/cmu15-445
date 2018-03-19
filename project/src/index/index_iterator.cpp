@@ -42,7 +42,7 @@ IndexIterator<KeyType, ValueType, KeyComparator> &IndexIterator<KeyType, ValueTy
 operator++() {
   ++index_;
   if (index_ == leaf_->GetSize() && leaf_->GetNextPageId() != INVALID_PAGE_ID) {
-    auto *page = buff_pool_manager_->FetchPage(INVALID_PAGE_ID);
+    auto *page = buff_pool_manager_->FetchPage(leaf_->GetNextPageId());
     if (page == nullptr) {
       throw Exception(EXCEPTION_TYPE_INDEX,
                       "all page are pinned while IndexIterator(operator++)");

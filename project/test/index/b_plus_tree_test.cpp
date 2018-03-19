@@ -138,6 +138,8 @@ TEST(BPlusTreeTests, InsertTest2) {
     current_key = current_key + 1;
   }
 
+  EXPECT_EQ(6, current_key);
+
   bpm->UnpinPage(HEADER_PAGE_ID, true);
   delete transaction;
   delete disk_manager;

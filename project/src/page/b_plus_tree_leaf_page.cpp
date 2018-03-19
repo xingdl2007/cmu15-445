@@ -158,9 +158,6 @@ MoveHalfTo(BPlusTreeLeafPage *recipient,
   MappingType *src = array + GetSize() - size;
   recipient->CopyHalfFrom(src, size);
   IncreaseSize(-1*size);
-
-  // chain together
-  SetNextPageId(recipient->GetPageId());
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>

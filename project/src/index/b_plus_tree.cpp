@@ -120,14 +120,26 @@ InsertIntoLeaf(const KeyType &key, const ValueType &value, Transaction *transact
     leaf->Insert(key, value, comparator_);
     buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
   } else {
-    // split
     auto *leaf2 = Split<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>(leaf);
     if (comparator_(key, leaf2->KeyAt(0)) < 0) {
       leaf->Insert(key, value, comparator_);
     } else {
       leaf2->Insert(key, value, comparator_);
     }
+
+    // chain together
+    if (comparator_(leaf->KeyAt(0), leaf2->KeyAt(0)) < 0) {
+      leaf2->SetNextPageId(leaf->GetNextPageId());
+      leaf->SetNextPageId(leaf2->GetPageId());
+    } else {
+      leaf2->SetNextPageId(leaf->GetPageId());
+    }
+
     InsertIntoParent(leaf, leaf2->KeyAt(0), leaf2, transaction);
+
+    // Unpin when we are done
+    buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
+    buffer_pool_manager_->UnpinPage(leaf2->GetPageId(), true);
   }
   return true;
 }
@@ -224,7 +236,7 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
       auto *copy = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t,
                                                           KeyComparator> *>(page->GetData());
       copy->Init(page_id);
-      copy->IncreaseSize(internal->GetSize() - 1);
+      copy->SetSize(internal->GetSize());
       for (int i = 1, j = 0; i <= internal->GetSize(); ++i, ++j) {
         if (internal->ValueAt(i - 1) == old_node->GetPageId()) {
           copy->SetKeyAt(j, key);
@@ -250,7 +262,7 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
       auto internal2 =
           Split<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>>(copy);
 
-      internal->IncreaseSize(-1*internal->GetSize() + copy->GetSize() + 1);
+      internal->SetSize(copy->GetSize() + 1);
       for (int i = 0; i < copy->GetSize(); ++i) {
         internal->SetKeyAt(i + 1, copy->KeyAt(i));
         internal->SetValueAt(i + 1, copy->ValueAt(i));
@@ -513,7 +525,7 @@ Begin() {
 template <typename KeyType, typename ValueType, typename KeyComparator>
 IndexIterator<KeyType, ValueType, KeyComparator> BPlusTree<KeyType, ValueType, KeyComparator>::
 Begin(const KeyType &key) {
-  auto *leaf = FindLeafPage(key, true);
+  auto *leaf = FindLeafPage(key, false);
   int index = 0;
   if (leaf != nullptr) {
     index = leaf->KeyIndex(key, comparator_);
