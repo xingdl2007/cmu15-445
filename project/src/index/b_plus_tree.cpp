@@ -367,7 +367,7 @@ CoalesceOrRedistribute(N *node, Transaction *transaction) {
  * @param   node               input from method coalesceOrRedistribute()
  * @param   parent             parent page of input "node"
  * @return  true means parent node should be deleted, false means no deletion
- * happend
+ * happened
  */
 template <typename KeyType, typename ValueType, typename KeyComparator>
 template <typename N>
@@ -557,7 +557,54 @@ UpdateRootPageId(bool insert_record) {
 template <typename KeyType, typename ValueType, typename KeyComparator>
 std::string BPlusTree<KeyType, ValueType, KeyComparator>::
 ToString(bool verbose) {
-  return "Empty tree";
+  if (IsEmpty()) {
+    return "Empty tree";
+  }
+  std::queue<page_id_t> todo, tmp;
+  std::stringstream tree;
+
+  todo.push(root_page_id_);
+  while (!todo.empty()) {
+    auto page_id = todo.front();
+    auto node = reinterpret_cast<BPlusTreePage *>(
+        buffer_pool_manager_->FetchPage(page_id));
+    // leaf page, print all key-value pairs
+    if (node->IsLeafPage()) {
+      auto page = reinterpret_cast<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *>(node);
+      for (int i = 0; i < page->GetSize(); ++i) {
+        auto item = page->GetItem(i);
+        // print all key-value pair
+        if (verbose) {
+          tree << " | " << item.first << ": " <<
+               item.second << " | ";
+        } else {
+          // only print all keys
+          tree << " | " << item.first << " | ";
+        }
+      }
+    } else {
+      auto page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>(node);
+      for (int i = 0; i < page->GetPageId(); ++i) {
+        // print all key-value pair
+        if (verbose) {
+          tree << " | " << page->KeyAt(i) << ": " <<
+               page->ValueAt(i) << " | ";
+        } else {
+          // only print all keys
+          tree << " | " << page->KeyAt(i) << " | ";
+        }
+        tmp.push(page->ValueAt(i));
+      }
+    }
+    todo.pop();
+    if (todo.empty() && !tmp.empty()) {
+      todo.swap(tmp);
+      tree << '\n';
+    }
+    // unpin node when we are done
+    buffer_pool_manager_->UnpinPage(node->GetPageId(), false);
+  }
+  return tree.str();
 }
 
 /*
