@@ -66,6 +66,17 @@ public:
   FindLeafPage(const KeyType &key, bool leftMost = false);
 
 private:
+  // for debug
+  class Checker {
+  public:
+    explicit Checker(BufferPoolManager *b) : buffer(b) {}
+    ~Checker() {
+      assert(buffer->Check());
+    }
+  private:
+    BufferPoolManager *buffer;
+  };
+
   void StartNewTree(const KeyType &key, const ValueType &value);
 
   bool InsertIntoLeaf(const KeyType &key, const ValueType &value,

@@ -16,7 +16,8 @@ namespace cmudb {
  */
 template <typename K, typename V>
 ExtendibleHash<K, V>::ExtendibleHash(size_t size):
-    bucket_size_(size), bucket_count_(0), depth(0) {
+    bucket_size_(size), bucket_count_(0), depth(0),
+    pair_count(0) {
   directory_.emplace_back(new Bucket(0, 0));
   // initial: 1 bucket
   bucket_count_ = 1;
@@ -112,6 +113,7 @@ bool ExtendibleHash<K, V>::Remove(const K &key) {
       cnt += next->items.erase(key);
       bucket = next;
     }
+    pair_count -= cnt;
   }
   return cnt != 0;
 }
@@ -194,6 +196,7 @@ void ExtendibleHash<K, V>::Insert(const K &key, const V &value) {
 
   // insert to target bucket
   bucket->items.insert({key, value});
+  ++pair_count;
 
   // may need split & redistribute bucket
   if (bucket->items.size() > bucket_size_) {

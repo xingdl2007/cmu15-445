@@ -56,6 +56,8 @@ public:
 
   void Insert(const K &key, const V &value) override;
 
+  size_t Size() const override { return pair_count; }
+
 private:
   std::unique_ptr<Bucket> split(std::shared_ptr<Bucket> &);
   size_t bucketIndex(const K &key);
@@ -65,7 +67,7 @@ private:
   const size_t bucket_size_;  // largest number of elements in a bucket
   int bucket_count_;          // number of buckets in use
   int depth;                  // global depth
-
+  size_t pair_count;          // key-value number in table
   std::vector<std::shared_ptr<Bucket>> directory_;  // smart pointer for auto memory management
 };
 

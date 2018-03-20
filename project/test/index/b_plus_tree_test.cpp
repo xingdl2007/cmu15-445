@@ -311,7 +311,7 @@ TEST(BPlusTreeTests, DeleteScale) {
   auto header_page = bpm->NewPage(page_id);
   (void) header_page;
 
-  int scale = 27;
+  int scale = 3;
   std::vector<int64_t> keys;
   for (int i = 0; i < scale; ++i) {
     keys.push_back(i + 1);

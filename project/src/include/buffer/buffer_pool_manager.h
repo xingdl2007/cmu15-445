@@ -40,6 +40,15 @@ public:
 
   bool DeletePage(page_id_t page_id);
 
+  // for debug
+  bool Check() const {
+    //std::cerr << "table: " << page_table_->Size() << " replacer: "
+    //          << replacer_->Size() << std::endl;
+    // +1 for header_page, in the test environment,
+    // header_page is out the replacer's control
+    return page_table_->Size() == (replacer_->Size() + 1);
+  }
+
 private:
   size_t pool_size_;                         // number of pages in buffer pool
   Page *pages_;                              // array of pages

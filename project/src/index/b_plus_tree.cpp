@@ -41,6 +41,9 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 bool BPlusTree<KeyType, ValueType, KeyComparator>::
 GetValue(const KeyType &key, std::vector<ValueType> &result,
          Transaction *transaction) {
+  // for debug
+  __attribute__((unused)) auto checker = Checker{buffer_pool_manager_};
+
   auto *leaf = FindLeafPage(key, false);
   bool ret = false;
   if (leaf != nullptr) {
@@ -67,6 +70,9 @@ GetValue(const KeyType &key, std::vector<ValueType> &result,
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool BPlusTree<KeyType, ValueType, KeyComparator>::
 Insert(const KeyType &key, const ValueType &value, Transaction *transaction) {
+  // for debug
+  __attribute__((unused)) auto checker = Checker{buffer_pool_manager_};
+
   if (IsEmpty()) {
     StartNewTree(key, value);
     return true;
@@ -316,6 +322,9 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void BPlusTree<KeyType, ValueType, KeyComparator>::
 Remove(const KeyType &key, Transaction *transaction) {
+  // for debug
+  __attribute__((unused)) auto checker = Checker{buffer_pool_manager_};
+
   if (IsEmpty()) {
     return;
   }
@@ -416,6 +425,8 @@ CoalesceOrRedistribute(N *node, Transaction *transaction) {
     } else {
       buffer_pool_manager_->UnpinPage(parent->GetPageId(), true);
     }
+    
+    buffer_pool_manager_->UnpinPage(sibling->GetPageId(), true);
     // node should not be deleted
     return false;
   } else {
