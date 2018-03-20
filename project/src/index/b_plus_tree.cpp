@@ -425,7 +425,7 @@ CoalesceOrRedistribute(N *node, Transaction *transaction) {
     } else {
       buffer_pool_manager_->UnpinPage(parent->GetPageId(), true);
     }
-    
+
     buffer_pool_manager_->UnpinPage(sibling->GetPageId(), true);
     // node should not be deleted
     return false;
