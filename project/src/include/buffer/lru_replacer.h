@@ -44,7 +44,9 @@ public:
   size_t Size();
 
 private:
-  // add your member variables here
+  // invariant check
+  void check();
+
   mutable std::mutex mutex_;
   std::unique_ptr<node> head_;
   node *tail_;

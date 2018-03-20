@@ -42,8 +42,7 @@ template <typename T> void LRUReplacer<T>::Insert(const T &value) {
       tail_ = tail_->next.get();
     }
   }
-
-  check();
+  //check();
 }
 
 /* If LRU is non-empty, pop the head member from LRU to argument "value", and
@@ -67,8 +66,7 @@ template <typename T> bool LRUReplacer<T>::Victim(T &value) {
   if (--size_ == 0) {
     tail_ = head_.get();   // reset tail
   }
-
-  check();
+  //check();
   return true;
 }
 
@@ -95,8 +93,7 @@ template <typename T> bool LRUReplacer<T>::Erase(const T &value) {
     if (--size_ == 0) {
       tail_ = head_.get();  // reset tail
     }
-
-    check();
+    //check();
     return true;
   }
   return false;
