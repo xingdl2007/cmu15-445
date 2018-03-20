@@ -42,15 +42,16 @@ bool BPlusTree<KeyType, ValueType, KeyComparator>::
 GetValue(const KeyType &key, std::vector<ValueType> &result,
          Transaction *transaction) {
   auto *leaf = FindLeafPage(key, false);
+  bool ret = false;
   if (leaf != nullptr) {
     ValueType value;
     if (leaf->Lookup(key, value, comparator_)) {
       result.push_back(value);
-      buffer_pool_manager_->UnpinPage(leaf->GetPageId(), false);
-      return true;
+      ret = true;
     }
+    buffer_pool_manager_->UnpinPage(leaf->GetPageId(), false);
   }
-  return false;
+  return ret;
 }
 
 /*****************************************************************************
@@ -93,6 +94,9 @@ StartNewTree(const KeyType &key, const ValueType &value) {
   UpdateRootPageId(true);
   root->Init(root_page_id_, INVALID_PAGE_ID);
   root->Insert(key, value, comparator_);
+
+  // unpin root
+  buffer_pool_manager_->UnpinPage(root->GetPageId(), true);
 }
 
 /*
@@ -143,10 +147,6 @@ InsertIntoLeaf(const KeyType &key, const ValueType &value, Transaction *transact
 
     // insert the split key into parent
     InsertIntoParent(leaf, leaf2->KeyAt(0), leaf2, transaction);
-
-    // unpin when we are done
-    buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
-    buffer_pool_manager_->UnpinPage(leaf2->GetPageId(), true);
   }
   return true;
 }
@@ -193,6 +193,7 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
       throw Exception(EXCEPTION_TYPE_INDEX,
                       "all page are pinned while InsertIntoParent");
     }
+    assert(page->GetPinCount() == 1);
     auto root =
         reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t,
                                                KeyComparator> *>(page->GetData());
@@ -208,7 +209,7 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
     buffer_pool_manager_->UnpinPage(old_node->GetPageId(), true);
     buffer_pool_manager_->UnpinPage(new_node->GetPageId(), true);
 
-    // root is also done
+    // parent is done
     buffer_pool_manager_->UnpinPage(root->GetPageId(), true);
 
   } else {
@@ -217,6 +218,7 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
       throw Exception(EXCEPTION_TYPE_INDEX,
                       "all page are pinned while InsertIntoParent");
     }
+    assert(page->GetPinCount() == 1);
     auto internal =
         reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t,
                                                KeyComparator> *>(page->GetData());
@@ -242,6 +244,7 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
         throw Exception(EXCEPTION_TYPE_INDEX,
                         "all page are pinned while InsertIntoParent");
       }
+      assert(page->GetPinCount() == 1);
 
       // copy will contain all internal node's pair excluding the first one
       // and plus the new one [key,value] which must be at the right position
@@ -284,7 +287,7 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
         old_node->SetParentPageId(internal2->GetPageId());
       }
 
-      // old_node and new_node is done, unpin thems
+      // old_node and new_node is done, unpin them
       buffer_pool_manager_->UnpinPage(old_node->GetPageId(), true);
       buffer_pool_manager_->UnpinPage(new_node->GetPageId(), true);
 
@@ -363,7 +366,7 @@ CoalesceOrRedistribute(N *node, Transaction *transaction) {
   auto parent =
       reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t,
                                              KeyComparator> *>(page->GetData());
-  // should be the same parent
+  // sibling should has the same parent with node
   int value_index = parent->ValueIndex(node->GetPageId());
   int sibling_page_id;
   if (value_index == 0) {
@@ -372,6 +375,7 @@ CoalesceOrRedistribute(N *node, Transaction *transaction) {
     sibling_page_id = parent->ValueAt(value_index - 1);
   }
 
+  // fetch sibling node
   page = buffer_pool_manager_->FetchPage(sibling_page_id);
   if (page == nullptr) {
     throw Exception(EXCEPTION_TYPE_INDEX,
@@ -380,16 +384,13 @@ CoalesceOrRedistribute(N *node, Transaction *transaction) {
   auto sibling = reinterpret_cast<N *>(page->GetData());
   bool redistribute = false;
 
-  // leaf node
-  if (node->IsLeafPage()) {
-    if (sibling->GetSize() + node->GetSize() > node->GetMaxSize()) {
-      redistribute = true;
-    }
-  } else {
-    // actually key number in internal node is `GetSize() -1 `
-    if (sibling->GetSize() - 1 + node->GetSize() - 1 > node->GetMaxSize() - 1) {
-      redistribute = true;
-    }
+  // 1. leaf node is a little bit different with internal node (key[0] is reserved)
+  // when determine distribution or coalescing.
+  // 2. the actually key number in internal node is `GetSize() -1 `
+  // and must plus separation key in the parent when consider distribution
+  // 3. but the condition for leaf/internal node is same
+  if (sibling->GetSize() + node->GetSize() > node->GetMaxSize()) {
+    redistribute = true;
   }
 
   // redistribute key-value pairs
@@ -404,7 +405,8 @@ CoalesceOrRedistribute(N *node, Transaction *transaction) {
     return false;
   }
 
-  // merge nodes
+  // merge nodes: if node is the first child of its parent, swap node and
+  // its sibling when call Coalesce for the assumption
   if (value_index == 0) {
     if (Coalesce<N>(node, sibling, parent, 1, transaction)) {
       buffer_pool_manager_->UnpinPage(parent->GetPageId(), false);
@@ -421,6 +423,7 @@ CoalesceOrRedistribute(N *node, Transaction *transaction) {
     } else {
       buffer_pool_manager_->UnpinPage(parent->GetPageId(), true);
     }
+
     buffer_pool_manager_->UnpinPage(sibling->GetPageId(), true);
     // node should be deleted
     return true;
@@ -453,11 +456,10 @@ Coalesce(N *&neighbor_node, N *&node,
     // adjust parent
     parent->Remove(index);
   } else {
-    // leaf page's deletion done in `Remove`
+    // leaf page's deletion done in `Remove()`
     buffer_pool_manager_->UnpinPage(node->GetPageId(), false);
     buffer_pool_manager_->DeletePage(node->GetPageId());
   }
-
   // recursive
   return CoalesceOrRedistribute(parent, transaction);
 }
@@ -487,6 +489,8 @@ Redistribute(N *neighbor_node, N *node, int index) {
         reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t,
                                                KeyComparator> *>(page->GetData());
     int idx = parent->ValueIndex(node->GetPageId());
+    buffer_pool_manager_->UnpinPage(parent->GetPageId(), false);
+
     neighbor_node->MoveLastToFrontOf(node, idx, buffer_pool_manager_);
   }
 }
@@ -532,6 +536,7 @@ AdjustRoot(BPlusTreePage *old_root_node) {
         reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t,
                                                KeyComparator> *>(page->GetData());
     new_root->SetParentPageId(INVALID_PAGE_ID);
+    buffer_pool_manager_->UnpinPage(root_page_id_, true);
     return true;
   }
   return false;
@@ -590,6 +595,7 @@ FindLeafPage(const KeyType &key, bool leftMost) {
     throw Exception(EXCEPTION_TYPE_INDEX,
                     "all page are pinned while FindLeafPage");
   }
+  assert(page->GetPinCount() == 1);
   auto *node = reinterpret_cast<BPlusTreePage *>(page->GetData());
 
   // find the leaf node
@@ -603,6 +609,7 @@ FindLeafPage(const KeyType &key, bool leftMost) {
     } else {
       next = internal->Lookup(key, comparator_);
     }
+    buffer_pool_manager_->UnpinPage(node->GetPageId(), false);
 
     page = buffer_pool_manager_->FetchPage(next);
     if (page == nullptr) {
@@ -610,7 +617,6 @@ FindLeafPage(const KeyType &key, bool leftMost) {
                       "all page are pinned while FindLeafPage");
     }
     node = reinterpret_cast<BPlusTreePage *>(page->GetData());
-    buffer_pool_manager_->UnpinPage(node->GetPageId(), false);
   }
   return reinterpret_cast<BPlusTreeLeafPage<KeyType,
                                             ValueType, KeyComparator> *>(node);

@@ -283,7 +283,7 @@ MoveAllTo(BPlusTreeInternalPage *recipient, int index_in_parent,
   // adjust parent
   parent->Remove(index_in_parent);
 
-  // unpin parent page
+  // unpin parent page and recipient
   buffer_pool_manager->UnpinPage(parent->GetPageId(), true);
 }
 
@@ -311,9 +311,9 @@ void BPlusTreeInternalPage<KeyType, ValueType, KeyComparator>::
 MoveFirstToEndOf(BPlusTreeInternalPage *recipient,
                  BufferPoolManager *buffer_pool_manager) {
   assert(GetSize() > 1);
-  MappingType pair = array[1];
+  MappingType pair{KeyAt(1), ValueAt(0)};
   page_id_t child_page_id = ValueAt(0);
-  array[0] = array[1];
+  SetValueAt(0, ValueAt(1));
   Remove(1);
 
   // delegate to helper function

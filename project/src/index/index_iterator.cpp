@@ -24,8 +24,15 @@ IndexIterator<KeyType, ValueType, KeyComparator>::
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool IndexIterator<KeyType, ValueType, KeyComparator>::
 isEnd() {
-  return (leaf_ == nullptr || (index_ == leaf_->GetSize() &&
-      leaf_->GetNextPageId() == INVALID_PAGE_ID));
+  if (leaf_ == nullptr) {
+    return true;
+  }
+  if (index_ == leaf_->GetSize() &&
+      leaf_->GetNextPageId() == INVALID_PAGE_ID) {
+    buff_pool_manager_->UnpinPage(leaf_->GetPageId(), false);
+    return true;
+  }
+  return false;
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
@@ -42,7 +49,11 @@ IndexIterator<KeyType, ValueType, KeyComparator> &IndexIterator<KeyType, ValueTy
 operator++() {
   ++index_;
   if (index_ == leaf_->GetSize() && leaf_->GetNextPageId() != INVALID_PAGE_ID) {
-    auto *page = buff_pool_manager_->FetchPage(leaf_->GetNextPageId());
+    // first unpin leaf_, then get the next leaf
+    page_id_t next_page_id = leaf_->GetNextPageId();
+    buff_pool_manager_->UnpinPage(leaf_->GetPageId(), false);
+
+    auto *page = buff_pool_manager_->FetchPage(next_page_id);
     if (page == nullptr) {
       throw Exception(EXCEPTION_TYPE_INDEX,
                       "all page are pinned while IndexIterator(operator++)");
