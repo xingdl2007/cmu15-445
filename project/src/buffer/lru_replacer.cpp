@@ -42,6 +42,8 @@ template <typename T> void LRUReplacer<T>::Insert(const T &value) {
       tail_ = tail_->next.get();
     }
   }
+
+  check();
 }
 
 /* If LRU is non-empty, pop the head member from LRU to argument "value", and
@@ -57,10 +59,16 @@ template <typename T> bool LRUReplacer<T>::Victim(T &value) {
 
   value = head_->next->data;
   head_->next = std::move(head_->next->next);
+  if (head_->next != nullptr) {
+    head_->next->pre = head_.get();
+  }
+
   table_.erase(value);
   if (--size_ == 0) {
     tail_ = head_.get();   // reset tail
   }
+
+  check();
   return true;
 }
 
@@ -87,6 +95,8 @@ template <typename T> bool LRUReplacer<T>::Erase(const T &value) {
     if (--size_ == 0) {
       tail_ = head_.get();  // reset tail
     }
+
+    check();
     return true;
   }
   return false;
@@ -95,6 +105,16 @@ template <typename T> bool LRUReplacer<T>::Erase(const T &value) {
 template <typename T> size_t LRUReplacer<T>::Size() {
   std::lock_guard<std::mutex> lock(mutex_);
   return size_;
+}
+
+// for debug: should be called when holding the lock
+template <typename T> void LRUReplacer<T>::check() {
+  node *pointer = head_.get();
+  while (pointer && pointer->next != nullptr) {
+    assert(pointer == pointer->next->pre);
+    pointer = pointer->next.get();
+  }
+  assert(pointer == tail_);
 }
 
 template class LRUReplacer<Page *>;
