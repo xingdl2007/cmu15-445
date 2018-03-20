@@ -116,14 +116,16 @@ InsertIntoLeaf(const KeyType &key, const ValueType &value, Transaction *transact
     return false;
   }
 
+  // if already in the tree, return false
+  ValueType v;
+  if (leaf->Lookup(key, v, comparator_)) {
+    buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
+    return false;
+  }
+
   if (leaf->GetSize() < leaf->GetMaxSize()) {
-    ValueType v;
-    if (leaf->Lookup(key, v, comparator_)) {
-      return false;
-    }
     leaf->Insert(key, value, comparator_);
     buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
-
   } else {
     // when leaf node can hold even number of key-value pairs
     // the following method is ok, but if the leaf node can hold
