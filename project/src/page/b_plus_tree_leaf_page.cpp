@@ -250,11 +250,12 @@ MoveAllTo(BPlusTreeLeafPage *recipient, int, BufferPoolManager *) {
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>::
 CopyAllFrom(MappingType *items, int size) {
-  assert(GetSize() + size < GetMaxSize());
-  IncreaseSize(size);
+  assert(GetSize() + size <= GetMaxSize());
+  auto start = GetSize();
   for (int i = 0; i < size; ++i) {
-    array[GetSize() + i] = *items++;
+    array[start + i] = *items++;
   }
+  IncreaseSize(size);
 }
 
 /*****************************************************************************

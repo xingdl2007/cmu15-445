@@ -344,8 +344,14 @@ CoalesceOrRedistribute(N *node, Transaction *transaction) {
     return AdjustRoot(node);
   }
   // no need to delete node
-  if (node->GetSize() >= node->GetMinSize()) {
-    return false;
+  if (node->IsLeafPage()) {
+    if (node->GetSize() >= node->GetMinSize()) {
+      return false;
+    }
+  } else {
+    if (node->GetSize() > node->GetMinSize()) {
+      return false;
+    }
   }
 
   auto *page = buffer_pool_manager_->FetchPage(node->GetParentPageId());
@@ -372,9 +378,22 @@ CoalesceOrRedistribute(N *node, Transaction *transaction) {
                     "all page are pinned while CoalesceOrRedistribute");
   }
   auto sibling = reinterpret_cast<N *>(page->GetData());
+  bool redistribute = false;
 
-  // redistribute
-  if (sibling->GetSize() + node->GetSize() > node->GetMaxSize()) {
+  // leaf node
+  if (node->IsLeafPage()) {
+    if (sibling->GetSize() + node->GetSize() > node->GetMaxSize()) {
+      redistribute = true;
+    }
+  } else {
+    // actually key number in internal node is `GetSize() -1 `
+    if (sibling->GetSize() - 1 + node->GetSize() - 1 > node->GetMaxSize() - 1) {
+      redistribute = true;
+    }
+  }
+
+  // redistribute key-value pairs
+  if (redistribute) {
     if (value_index == 0) {
       Redistribute<N>(sibling, node, 0);   // sibling is successor of node
     } else {
@@ -385,18 +404,14 @@ CoalesceOrRedistribute(N *node, Transaction *transaction) {
     return false;
   }
 
-  // merge
+  // merge nodes
   if (value_index == 0) {
-    if (Coalesce<N>(node, sibling, parent, value_index, transaction)) {
+    if (Coalesce<N>(node, sibling, parent, 1, transaction)) {
       buffer_pool_manager_->UnpinPage(parent->GetPageId(), false);
       buffer_pool_manager_->DeletePage(parent->GetPageId());
     } else {
       buffer_pool_manager_->UnpinPage(parent->GetPageId(), true);
     }
-
-    buffer_pool_manager_->UnpinPage(sibling->GetPageId(), false);
-    buffer_pool_manager_->DeletePage(sibling->GetPageId());
-
     // node should not be deleted
     return false;
   } else {
@@ -406,9 +421,7 @@ CoalesceOrRedistribute(N *node, Transaction *transaction) {
     } else {
       buffer_pool_manager_->UnpinPage(parent->GetPageId(), true);
     }
-
     buffer_pool_manager_->UnpinPage(sibling->GetPageId(), true);
-
     // node should be deleted
     return true;
   }
@@ -433,18 +446,20 @@ Coalesce(N *&neighbor_node, N *&node,
          BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *&parent,
          int index, Transaction *transaction) {
 
-  // neighbor_node is predecessor of node
+  // assumption: neighbor_node is predecessor of node
   node->MoveAllTo(neighbor_node, index, buffer_pool_manager_);
-  parent->Remove(index);
 
-  if (CoalesceOrRedistribute(parent, transaction)) {
-    buffer_pool_manager_->UnpinPage(parent->GetPageId(), false);
-    buffer_pool_manager_->DeletePage(parent->GetPageId());
-    return true;
+  if (node->IsLeafPage()) {
+    // adjust parent
+    parent->Remove(index);
   } else {
-    buffer_pool_manager_->UnpinPage(parent->GetPageId(), true);
-    return false;
+    // leaf page's deletion done in `Remove`
+    buffer_pool_manager_->UnpinPage(node->GetPageId(), false);
+    buffer_pool_manager_->DeletePage(node->GetPageId());
   }
+
+  // recursive
+  return CoalesceOrRedistribute(parent, transaction);
 }
 
 /*
@@ -506,6 +521,17 @@ AdjustRoot(BPlusTreePage *old_root_node) {
                                                KeyComparator> *>(old_root_node);
     root_page_id_ = root->ValueAt(0);
     UpdateRootPageId(false);
+
+    // set the new root's parent id "INVALID_PAGE_ID"
+    auto *page = buffer_pool_manager_->FetchPage(root_page_id_);
+    if (page == nullptr) {
+      throw Exception(EXCEPTION_TYPE_INDEX,
+                      "all page are pinned while AdjustRoot");
+    }
+    auto new_root =
+        reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t,
+                                               KeyComparator> *>(page->GetData());
+    new_root->SetParentPageId(INVALID_PAGE_ID);
     return true;
   }
   return false;
@@ -568,9 +594,10 @@ FindLeafPage(const KeyType &key, bool leftMost) {
 
   // find the leaf node
   while (!node->IsLeafPage()) {
-    auto internal = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>(node);
+    auto internal =
+        reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t,
+                                               KeyComparator> *>(node);
     page_id_t next;
-
     if (leftMost) {
       next = internal->ValueAt(0);
     } else {
@@ -585,7 +612,8 @@ FindLeafPage(const KeyType &key, bool leftMost) {
     node = reinterpret_cast<BPlusTreePage *>(page->GetData());
     buffer_pool_manager_->UnpinPage(node->GetPageId(), false);
   }
-  return reinterpret_cast<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *>(node);
+  return reinterpret_cast<BPlusTreeLeafPage<KeyType,
+                                            ValueType, KeyComparator> *>(node);
 }
 
 /*

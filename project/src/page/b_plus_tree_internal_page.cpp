@@ -185,6 +185,18 @@ MoveHalfTo(BPlusTreeInternalPage *recipient,
            BufferPoolManager *buffer_pool_manager) {
   auto half = (GetSize() + 1)/2;
   recipient->CopyHalfFrom(array + GetSize() - half, half, buffer_pool_manager);
+
+  // update parent page id of all children
+  for (auto index = GetSize() - half; index < GetSize(); ++index) {
+    auto *page = buffer_pool_manager->FetchPage(ValueAt(index));
+    if (page == nullptr) {
+      throw Exception(EXCEPTION_TYPE_INDEX,
+                      "all page are pinned while CopyLastFrom");
+    }
+    auto child = reinterpret_cast<BPlusTreePage *>(page->GetData());
+    child->SetParentPageId(recipient->GetPageId());
+    buffer_pool_manager->UnpinPage(child->GetPageId(), true);
+  }
   IncreaseSize(-1*half);
 }
 
@@ -213,7 +225,7 @@ void BPlusTreeInternalPage<KeyType, ValueType, KeyComparator>::
 Remove(int index) {
   assert(0 <= index && index < GetSize());
   for (int i = index; i < GetSize() - 1; ++i) {
-    array[index] = array[index + 1];
+    array[i] = array[i + 1];
   }
   IncreaseSize(-1);
 }
@@ -241,15 +253,34 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 void BPlusTreeInternalPage<KeyType, ValueType, KeyComparator>::
 MoveAllTo(BPlusTreeInternalPage *recipient, int index_in_parent,
           BufferPoolManager *buffer_pool_manager) {
-  // assumption: current page is at the right hand of recipient
-  recipient->CopyAllFrom(array + 1, GetSize() - 1, buffer_pool_manager);
-
+  // first find parent
   auto *page = buffer_pool_manager->FetchPage(GetParentPageId());
   if (page == nullptr) {
     throw Exception(EXCEPTION_TYPE_INDEX,
                     "all page are pinned while MoveAllTo");
   }
   auto *parent = reinterpret_cast<BPlusTreeInternalPage *>(page->GetData());
+
+  // the separation key from parent
+  SetKeyAt(0, parent->KeyAt(index_in_parent));
+
+  // assumption: current page is at the right hand of recipient
+  assert(parent->ValueAt(index_in_parent) == GetPageId());
+  recipient->CopyAllFrom(array, GetSize(), buffer_pool_manager);
+
+  // update parent page id of all children
+  for (auto index = 0; index < GetSize(); ++index) {
+    auto *page = buffer_pool_manager->FetchPage(ValueAt(index));
+    if (page == nullptr) {
+      throw Exception(EXCEPTION_TYPE_INDEX,
+                      "all page are pinned while CopyLastFrom");
+    }
+    auto child = reinterpret_cast<BPlusTreePage *>(page->GetData());
+    child->SetParentPageId(recipient->GetPageId());
+    buffer_pool_manager->UnpinPage(child->GetPageId(), true);
+  }
+
+  // adjust parent
   parent->Remove(index_in_parent);
 
   // unpin parent page
@@ -260,9 +291,10 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 void BPlusTreeInternalPage<KeyType, ValueType, KeyComparator>::
 CopyAllFrom(MappingType *items, int size,
             BufferPoolManager *buffer_pool_manager) {
-  assert(GetSize() + size < GetMaxSize());
-  for (int i = GetSize(); i < size; ++i) {
-    array[i] = *items++;
+  assert(GetSize() + size <= GetMaxSize());
+  int start = GetSize();
+  for (int i = 0; i < size; ++i) {
+    array[start + i] = *items++;
   }
   IncreaseSize(size);
 }
@@ -280,11 +312,22 @@ MoveFirstToEndOf(BPlusTreeInternalPage *recipient,
                  BufferPoolManager *buffer_pool_manager) {
   assert(GetSize() > 1);
   MappingType pair = array[1];
+  page_id_t child_page_id = ValueAt(0);
   array[0] = array[1];
   Remove(1);
 
   // delegate to helper function
   recipient->CopyLastFrom(pair, buffer_pool_manager);
+
+  // update child parent page id
+  auto *page = buffer_pool_manager->FetchPage(child_page_id);
+  if (page == nullptr) {
+    throw Exception(EXCEPTION_TYPE_INDEX,
+                    "all page are pinned while CopyLastFrom");
+  }
+  auto child = reinterpret_cast<BPlusTreePage *>(page->GetData());
+  child->SetParentPageId(recipient->GetPageId());
+  buffer_pool_manager->UnpinPage(child->GetPageId(), true);
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
@@ -321,7 +364,20 @@ MoveLastToFrontOf(BPlusTreeInternalPage *recipient, int parent_index,
   assert(GetSize() > 1);
   IncreaseSize(-1);
   MappingType pair = array[GetSize()];
+  page_id_t child_page_id = pair.second;
+
+  // delegate
   recipient->CopyFirstFrom(pair, parent_index, buffer_pool_manager);
+
+  // update child parent page id
+  auto *page = buffer_pool_manager->FetchPage(child_page_id);
+  if (page == nullptr) {
+    throw Exception(EXCEPTION_TYPE_INDEX,
+                    "all page are pinned while CopyLastFrom");
+  }
+  auto child = reinterpret_cast<BPlusTreePage *>(page->GetData());
+  child->SetParentPageId(recipient->GetPageId());
+  buffer_pool_manager->UnpinPage(child->GetPageId(), true);
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
