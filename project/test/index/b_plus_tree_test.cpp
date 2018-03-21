@@ -482,7 +482,7 @@ TEST(BPlusTreeTests, DeleteRandom) {
   (void) header_page;
 
   std::vector<int64_t> keys;
-  int scale = 46;
+  int scale = 1000;
   for (int i = 0; i < scale; ++i) {
     keys.push_back(i + 1);
   }
