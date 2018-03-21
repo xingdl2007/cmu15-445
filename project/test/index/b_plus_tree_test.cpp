@@ -445,6 +445,22 @@ TEST(BPlusTreeTests, DeleteScale) {
   remove("test.log");
 }
 
+/*
+  std::vector<int64_t> keys = {
+      31, 37, 24, 38, 33, 17, 30, 32, 6, 29, 7, 18, 20, 34, 40,
+      46, 28, 44, 1, 23, 2, 35, 27, 26, 3, 9, 12, 45, 43, 39, 36,
+      16, 41, 10, 13, 21, 22, 15, 42, 4, 14, 8, 19, 5, 11, 25
+  };
+
+  std::vector<int64_t> remove_keys = {
+      29, 34, 37
+  };
+
+  std::for_each(keys.begin(), keys.end(), [](int i) {
+    std::cerr << i << ", ";
+  });
+  std::cerr << std::endl;
+ */
 TEST(BPlusTreeTests, DeleteRandom) {
   // create KeyComparator and index schema
   Schema *key_schema = ParseCreateStatement("a bigint");
@@ -465,20 +481,12 @@ TEST(BPlusTreeTests, DeleteRandom) {
   auto header_page = bpm->NewPage(page_id);
   (void) header_page;
 
-  std::vector<int64_t> keys = {
-      31, 37, 24, 38, 33, 17, 30, 32, 6, 29, 7, 18, 20, 34, 40,
-      46, 28, 44, 1, 23, 2, 35, 27, 26, 3, 9, 12, 45, 43, 39, 36,
-      16, 41, 10, 13, 21, 22, 15, 42, 4, 14, 8, 19, 5, 11, 25
-  };
-  //int scale = 46;
-  //for (int i = 0; i < scale; ++i) {
-  //  keys.push_back(i + 1);
-  //}
-  //std::random_shuffle(keys.begin(), keys.end());
-  std::for_each(keys.begin(), keys.end(), [](int i) {
-    std::cerr << i << ", ";
-  });
-  std::cerr << std::endl;
+  std::vector<int64_t> keys;
+  int scale = 46;
+  for (int i = 0; i < scale; ++i) {
+    keys.push_back(i + 1);
+  }
+  std::random_shuffle(keys.begin(), keys.end());
 
   for (auto key : keys) {
     int64_t value = key & 0xFFFFFFFF;
@@ -487,12 +495,9 @@ TEST(BPlusTreeTests, DeleteRandom) {
     tree.Insert(index_key, rid, transaction);
   }
 
-  std::vector<int64_t> remove_keys = {
-      29, 34, 37
-  };
-
+  std::random_shuffle(keys.begin(), keys.end());
   // delete all
-  for (auto key :remove_keys) {
+  for (auto key :keys) {
     index_key.SetFromInteger(key);
     tree.Remove(index_key, transaction);
   }

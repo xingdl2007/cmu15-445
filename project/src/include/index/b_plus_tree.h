@@ -66,9 +66,6 @@ public:
   FindLeafPage(const KeyType &key, bool leftMost = false);
 
 private:
-  // for debug
-  void Verify();
-
   class Checker {
   public:
     explicit Checker(BufferPoolManager *b) : buffer(b) {}

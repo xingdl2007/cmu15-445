@@ -343,6 +343,8 @@ Remove(const KeyType &key, Transaction *transaction) {
       buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
     }
   }
+
+  Verify();
 }
 
 /*
@@ -754,53 +756,6 @@ RemoveFromFile(const std::string &file_name, Transaction *transaction) {
     KeyType index_key{};
     index_key.SetFromInteger(key);
     Remove(index_key, transaction);
-  }
-}
-
-/*
- * This method is used for test only
- * verify page_id and parent_page_id is right
- */
-template <typename KeyType, typename ValueType, typename KeyComparator>
-void BPlusTree<KeyType, ValueType, KeyComparator>::
-Verify() {
-  if (IsEmpty()) {
-    return;
-  }
-  // start from root, check all nodes
-  auto *page = buffer_pool_manager_->FetchPage(root_page_id_);
-  if (page == nullptr) {
-    throw Exception(EXCEPTION_TYPE_INDEX,
-                    "all page are pinned while verify");
-  }
-  assert(page->GetPinCount() == 1);
-  auto *root = reinterpret_cast<BPlusTreePage *>(page->GetData());
-
-  // if node is leaf, we are done
-  if (root->IsLeafPage()) {
-    buffer_pool_manager_->UnpinPage(root->GetPageId(), false);
-    return;
-  }
-
-  // node is an internal
-  auto *node =
-      reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t,
-                                             KeyComparator> *>(root);
-  // call internal node's verify
-  std::queue<BPlusTreePage *> queue;
-  node->QueueUpChildren(&queue, buffer_pool_manager_);
-  buffer_pool_manager_->UnpinPage(node->GetPageId(), false);
-  while (!queue.empty()) {
-    auto *child = queue.front();
-    queue.pop();
-    if (child->IsLeafPage()) {
-      buffer_pool_manager_->UnpinPage(child->GetPageId(), false);
-      continue;
-    }
-    auto *node = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t,
-                                                        KeyComparator> *>(child);
-    node->QueueUpChildren(&queue, buffer_pool_manager_);
-    buffer_pool_manager_->UnpinPage(node->GetPageId(), false);
   }
 }
 
