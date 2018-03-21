@@ -195,6 +195,8 @@ MoveHalfTo(BPlusTreeInternalPage *recipient,
     }
     auto child = reinterpret_cast<BPlusTreePage *>(page->GetData());
     child->SetParentPageId(recipient->GetPageId());
+
+    assert(child->GetParentPageId() == recipient->GetPageId());
     buffer_pool_manager->UnpinPage(child->GetPageId(), true);
   }
   IncreaseSize(-1*half);
@@ -277,6 +279,8 @@ MoveAllTo(BPlusTreeInternalPage *recipient, int index_in_parent,
     }
     auto child = reinterpret_cast<BPlusTreePage *>(page->GetData());
     child->SetParentPageId(recipient->GetPageId());
+
+    assert(child->GetParentPageId() == recipient->GetPageId());
     buffer_pool_manager->UnpinPage(child->GetPageId(), true);
   }
 
@@ -327,13 +331,15 @@ MoveFirstToEndOf(BPlusTreeInternalPage *recipient,
   }
   auto child = reinterpret_cast<BPlusTreePage *>(page->GetData());
   child->SetParentPageId(recipient->GetPageId());
+
+  assert(child->GetParentPageId() == recipient->GetPageId());
   buffer_pool_manager->UnpinPage(child->GetPageId(), true);
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void BPlusTreeInternalPage<KeyType, ValueType, KeyComparator>::
 CopyLastFrom(const MappingType &pair, BufferPoolManager *buffer_pool_manager) {
-  assert(GetSize() + 1 < GetMaxSize());
+  assert(GetSize() + 1 <= GetMaxSize());
 
   auto *page = buffer_pool_manager->FetchPage(GetParentPageId());
   if (page == nullptr) {
@@ -377,6 +383,8 @@ MoveLastToFrontOf(BPlusTreeInternalPage *recipient, int parent_index,
   }
   auto child = reinterpret_cast<BPlusTreePage *>(page->GetData());
   child->SetParentPageId(recipient->GetPageId());
+
+  assert(child->GetParentPageId() == recipient->GetPageId());
   buffer_pool_manager->UnpinPage(child->GetPageId(), true);
 }
 
@@ -417,8 +425,9 @@ QueueUpChildren(std::queue<BPlusTreePage *> *queue,
       throw Exception(EXCEPTION_TYPE_INDEX,
                       "all page are pinned while printing");
     }
-    auto *node = reinterpret_cast<BPlusTreePage *>(page->GetData());
-    queue->push(node);
+    auto *child = reinterpret_cast<BPlusTreePage *>(page->GetData());
+    assert(child->GetParentPageId() == GetPageId());
+    queue->push(child);
   }
 }
 
@@ -430,11 +439,10 @@ ToString(bool verbose) const {
   }
   std::ostringstream os;
   if (verbose) {
-    os << "[pageId: " << GetPageId() << " parentId: "
-       << GetParentPageId() << "] <size: " << GetSize()
-       << ", max: " << GetMaxSize() << "> ";
+    os << "[" << GetPageId() << "-"
+       << GetParentPageId() << "]";
   }
-  int entry = verbose ? 0 : 1;
+  int entry = 1;//verbose ? 0 : 1;
   int end = GetSize();
   bool first = true;
   while (entry < end) {
@@ -443,10 +451,10 @@ ToString(bool verbose) const {
     } else {
       os << " ";
     }
-    os << std::dec << array[entry].first.ToString();
-    if (verbose) {
-      os << "(" << array[entry].second << ")";
-    }
+    os << std::dec << " " << array[entry].first.ToString();
+    //if (verbose) {
+    //  os << "(" << array[entry].second << ")";
+    //}
     ++entry;
     os << " ";
   }

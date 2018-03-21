@@ -350,8 +350,7 @@ ToString(bool verbose) const {
   }
   std::ostringstream stream;
   if (verbose) {
-    stream << "[pageId: " << GetPageId() << " parentId: " << GetParentPageId()
-           << "] <size: " << GetSize() << ", max: " << GetMaxSize() << "> ";
+    stream << "[" << GetPageId() << "-" << GetParentPageId() << "]";
   }
   int entry = 0;
   int end = GetSize();
@@ -363,10 +362,10 @@ ToString(bool verbose) const {
     } else {
       stream << " ";
     }
-    stream << std::dec << array[entry].first;
-    if (verbose) {
-      stream << " (" << array[entry].second << ")";
-    }
+    stream << std::dec << " " << array[entry].first;
+    //if (verbose) {
+    //  stream << " (" << array[entry].second << ")";
+    //}
     ++entry;
     stream << " ";
   }

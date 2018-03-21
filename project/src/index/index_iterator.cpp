@@ -19,20 +19,15 @@ IndexIterator(BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *leaf,
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 IndexIterator<KeyType, ValueType, KeyComparator>::
-~IndexIterator() = default;
+~IndexIterator() {
+  buff_pool_manager_->UnpinPage(leaf_->GetPageId(), false);
+};
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool IndexIterator<KeyType, ValueType, KeyComparator>::
 isEnd() {
-  if (leaf_ == nullptr) {
-    return true;
-  }
-  if (index_ == leaf_->GetSize() &&
-      leaf_->GetNextPageId() == INVALID_PAGE_ID) {
-    buff_pool_manager_->UnpinPage(leaf_->GetPageId(), false);
-    return true;
-  }
-  return false;
+  return (leaf_ == nullptr || (index_ == leaf_->GetSize() &&
+      leaf_->GetNextPageId() == INVALID_PAGE_ID));
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
@@ -61,6 +56,8 @@ operator++() {
     auto next_leaf =
         reinterpret_cast<BPlusTreeLeafPage<KeyType, ValueType,
                                            KeyComparator> *>(page->GetData());
+
+    assert(next_leaf->IsLeafPage());
     index_ = 0;
     leaf_ = next_leaf;
   }
