@@ -371,6 +371,7 @@ CoalesceOrRedistribute(N *node, Transaction *transaction) {
     }
   }
 
+  // get parent first
   auto *page = buffer_pool_manager_->FetchPage(node->GetParentPageId());
   if (page == nullptr) {
     throw Exception(EXCEPTION_TYPE_INDEX,
@@ -409,6 +410,9 @@ CoalesceOrRedistribute(N *node, Transaction *transaction) {
   // 3. but the condition for leaf/internal node is same
   if (sibling->GetSize() + node->GetSize() > node->GetMaxSize()) {
     redistribute = true;
+
+    // release parent
+    buffer_pool_manager_->UnpinPage(parent->GetPageId(), true);
   }
 
   // redistribute key-value pairs
@@ -425,26 +429,15 @@ CoalesceOrRedistribute(N *node, Transaction *transaction) {
   // merge nodes: if node is the first child of its parent, swap node and
   // its sibling when call Coalesce for the assumption
   if (value_index == 0) {
-    if (Coalesce<N>(node, sibling, parent, 1, transaction)) {
-      buffer_pool_manager_->UnpinPage(parent->GetPageId(), false);
-      buffer_pool_manager_->DeletePage(parent->GetPageId());
-    } else {
-      buffer_pool_manager_->UnpinPage(parent->GetPageId(), true);
-    }
-
-    buffer_pool_manager_->UnpinPage(sibling->GetPageId(), false);
-    buffer_pool_manager_->DeletePage(sibling->GetPageId());
+    // it's Coalesce's responsibility to delete/save parent
+    Coalesce<N>(node, sibling, parent, 1, transaction);
+    buffer_pool_manager_->UnpinPage(sibling_page_id, false);
+    buffer_pool_manager_->DeletePage(sibling_page_id);
     // node should not be deleted
     return false;
   } else {
-    if (Coalesce<N>(sibling, node, parent, value_index, transaction)) {
-      buffer_pool_manager_->UnpinPage(parent->GetPageId(), false);
-      buffer_pool_manager_->DeletePage(parent->GetPageId());
-    } else {
-      buffer_pool_manager_->UnpinPage(parent->GetPageId(), true);
-    }
-
-    buffer_pool_manager_->UnpinPage(sibling->GetPageId(), true);
+    Coalesce<N>(sibling, node, parent, value_index, transaction);
+    buffer_pool_manager_->UnpinPage(sibling_page_id, true);
     // node should be deleted
     return true;
   }
@@ -464,7 +457,7 @@ CoalesceOrRedistribute(N *node, Transaction *transaction) {
  */
 template <typename KeyType, typename ValueType, typename KeyComparator>
 template <typename N>
-bool BPlusTree<KeyType, ValueType, KeyComparator>::
+void BPlusTree<KeyType, ValueType, KeyComparator>::
 Coalesce(N *neighbor_node, N *node,
          BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *parent,
          int index, Transaction *transaction) {
@@ -480,8 +473,15 @@ Coalesce(N *neighbor_node, N *node,
     buffer_pool_manager_->UnpinPage(node->GetPageId(), false);
     buffer_pool_manager_->DeletePage(node->GetPageId());
   }
+
   // recursive
-  return CoalesceOrRedistribute(parent, transaction);
+  page_id_t page_id = parent->GetPageId();
+  if (CoalesceOrRedistribute(parent, transaction)) {
+    buffer_pool_manager_->UnpinPage(page_id, false);
+    buffer_pool_manager_->DeletePage(page_id);
+  } else {
+    buffer_pool_manager_->UnpinPage(page_id, true);
+  }
 }
 
 /*
