@@ -343,8 +343,6 @@ Remove(const KeyType &key, Transaction *transaction) {
       buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
     }
   }
-
-  Verify();
 }
 
 /*
