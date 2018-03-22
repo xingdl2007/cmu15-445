@@ -465,10 +465,8 @@ Coalesce(N *neighbor_node, N *node,
   // assumption: neighbor_node is predecessor of node
   node->MoveAllTo(neighbor_node, index, buffer_pool_manager_);
 
-  if (node->IsLeafPage()) {
-    // adjust parent
-    parent->Remove(index);
-  }
+  // adjust parent
+  parent->Remove(index);
 
   // recursive
   page_id_t page_id = parent->GetPageId();

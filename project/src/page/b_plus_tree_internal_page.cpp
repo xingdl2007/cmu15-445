@@ -268,6 +268,10 @@ MoveAllTo(BPlusTreeInternalPage *recipient, int index_in_parent,
 
   // assumption: current page is at the right hand of recipient
   assert(parent->ValueAt(index_in_parent) == GetPageId());
+
+  // unpin parent page
+  buffer_pool_manager->UnpinPage(parent->GetPageId(), true);
+
   recipient->CopyAllFrom(array, GetSize(), buffer_pool_manager);
 
   // update parent page id of all children
@@ -283,12 +287,6 @@ MoveAllTo(BPlusTreeInternalPage *recipient, int index_in_parent,
     assert(child->GetParentPageId() == recipient->GetPageId());
     buffer_pool_manager->UnpinPage(child->GetPageId(), true);
   }
-
-  // adjust parent
-  parent->Remove(index_in_parent);
-
-  // unpin parent page and recipient
-  buffer_pool_manager->UnpinPage(parent->GetPageId(), true);
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
