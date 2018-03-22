@@ -295,7 +295,7 @@ MoveFirstToEndOf(BPlusTreeLeafPage *recipient,
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>::
 CopyLastFrom(const MappingType &item) {
-  assert(GetSize() + 1 < GetMaxSize());
+  assert(GetSize() + 1 <= GetMaxSize());
   array[GetSize()] = item;
   IncreaseSize(1);
 }
