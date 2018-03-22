@@ -308,8 +308,8 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 void BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>::
 MoveLastToFrontOf(BPlusTreeLeafPage *recipient, int parentIndex,
                   BufferPoolManager *buffer_pool_manager) {
+  MappingType pair = GetItem(GetSize() - 1);
   IncreaseSize(-1);
-  MappingType pair = GetItem(GetSize());
   recipient->CopyFirstFrom(pair, parentIndex, buffer_pool_manager);
 }
 

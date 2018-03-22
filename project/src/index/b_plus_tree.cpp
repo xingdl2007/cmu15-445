@@ -468,10 +468,6 @@ Coalesce(N *neighbor_node, N *node,
   if (node->IsLeafPage()) {
     // adjust parent
     parent->Remove(index);
-  } else {
-    // leaf page's deletion done in `Remove()`
-    buffer_pool_manager_->UnpinPage(node->GetPageId(), false);
-    buffer_pool_manager_->DeletePage(node->GetPageId());
   }
 
   // recursive
