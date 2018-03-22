@@ -363,9 +363,9 @@ ToString(bool verbose) const {
       stream << " ";
     }
     stream << std::dec << " " << array[entry].first;
-    //if (verbose) {
-    //  stream << " (" << array[entry].second << ")";
-    //}
+    if (verbose) {
+      stream << " (" << array[entry].second << ")";
+    }
     ++entry;
     stream << " ";
   }

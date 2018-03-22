@@ -440,7 +440,7 @@ ToString(bool verbose) const {
     os << "[" << GetPageId() << "-"
        << GetParentPageId() << "]";
   }
-  int entry = 1;//verbose ? 0 : 1;
+  int entry = verbose ? 0 : 1;
   int end = GetSize();
   bool first = true;
   while (entry < end) {
@@ -450,9 +450,9 @@ ToString(bool verbose) const {
       os << " ";
     }
     os << std::dec << " " << array[entry].first.ToString();
-    //if (verbose) {
-    //  os << "(" << array[entry].second << ")";
-    //}
+    if (verbose) {
+      os << "(" << array[entry].second << ")";
+    }
     ++entry;
     os << " ";
   }
