@@ -135,8 +135,8 @@ InsertIntoLeaf(const KeyType &key, const ValueType &value, Transaction *transact
   } else {
     // when leaf node can hold even number of key-value pairs
     // the following method is ok, but if the leaf node can hold
-    // odd number of pairs, the folling split method may uneven
-    // one child may have two more pairs than the other which shoud
+    // odd number of pairs, the following split method may uneven
+    // one child may have two more pairs than the other which should
     // be equal.
     auto *leaf2 = Split<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>>(leaf);
     if (comparator_(key, leaf2->KeyAt(0)) < 0) {
