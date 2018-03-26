@@ -82,7 +82,7 @@ private:
   int32_t GetFreeSpacePointer(); // offset of the beginning of free space
   void SetFreeSpacePointer(int32_t free_space_pointer);
   int32_t GetTupleCount(); // Note that this tuple count may be larger than # of
-                           // actual tuples because some slots may be empty
+  // actual tuples because some slots may be empty
   void SetTupleCount(int32_t tuple_count);
   int32_t GetFreeSpaceSize();
 };
