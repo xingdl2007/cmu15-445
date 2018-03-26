@@ -56,6 +56,92 @@ TEST(LockManagerTest, BasicTest) {
   t1.join();
 }
 
+TEST(LockManagerTest, BasicShareTest) {
+  LockManager lock_mgr{false};
+  TransactionManager txn_mgr{&lock_mgr};
+  RID rid{0, 0};
+
+  std::thread t0([&] {
+    Transaction txn(0);
+    bool res = lock_mgr.LockShared(&txn, rid);
+    EXPECT_EQ(res, true);
+    EXPECT_EQ(txn.GetState(), TransactionState::GROWING);
+    txn_mgr.Commit(&txn);
+    EXPECT_EQ(txn.GetState(), TransactionState::COMMITTED);
+  });
+
+  std::thread t1([&] {
+    Transaction txn(1);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    bool res = lock_mgr.LockShared(&txn, rid);
+    EXPECT_EQ(res, true);
+    EXPECT_EQ(txn.GetState(), TransactionState::GROWING);
+    txn_mgr.Commit(&txn);
+    EXPECT_EQ(txn.GetState(), TransactionState::COMMITTED);
+  });
+
+  std::thread t2([&] {
+    Transaction txn(2);
+    bool res = lock_mgr.LockShared(&txn, rid);
+    EXPECT_EQ(res, true);
+    EXPECT_EQ(txn.GetState(), TransactionState::GROWING);
+    txn_mgr.Commit(&txn);
+    EXPECT_EQ(txn.GetState(), TransactionState::COMMITTED);
+  });
+
+  std::thread t3([&] {
+    Transaction txn(3);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    bool res = lock_mgr.LockShared(&txn, rid);
+    EXPECT_EQ(res, true);
+    EXPECT_EQ(txn.GetState(), TransactionState::GROWING);
+    txn_mgr.Commit(&txn);
+    EXPECT_EQ(txn.GetState(), TransactionState::COMMITTED);
+  });
+
+  std::thread t4([&] {
+    Transaction txn(4);
+    bool res = lock_mgr.LockShared(&txn, rid);
+    EXPECT_EQ(res, true);
+    EXPECT_EQ(txn.GetState(), TransactionState::GROWING);
+    txn_mgr.Commit(&txn);
+    EXPECT_EQ(txn.GetState(), TransactionState::COMMITTED);
+  });
+
+  std::thread t5([&] {
+    Transaction txn(5);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    bool res = lock_mgr.LockShared(&txn, rid);
+    EXPECT_EQ(res, true);
+    EXPECT_EQ(txn.GetState(), TransactionState::GROWING);
+    txn_mgr.Commit(&txn);
+    EXPECT_EQ(txn.GetState(), TransactionState::COMMITTED);
+  });
+
+  std::thread t6([&] {
+    Transaction txn(6);
+    bool res = lock_mgr.LockShared(&txn, rid);
+    EXPECT_EQ(res, true);
+    EXPECT_EQ(txn.GetState(), TransactionState::GROWING);
+    txn_mgr.Commit(&txn);
+    EXPECT_EQ(txn.GetState(), TransactionState::COMMITTED);
+  });
+
+  t0.join();
+  t1.join();
+  t2.join();
+  t3.join();
+  t4.join();
+  t5.join();
+  t6.join();
+}
+
 TEST(LockManagerTest, BasicTest1) {
   LockManager lock_mgr{false};
   TransactionManager txn_mgr{&lock_mgr};
