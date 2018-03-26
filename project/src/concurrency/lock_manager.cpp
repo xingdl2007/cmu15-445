@@ -18,15 +18,16 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
   Request req{txn->GetTransactionId(), LockMode::SHARED, false};
   if (lock_table_.count(rid) == 0) {
     Waiting waiting;
+    waiting.exclusive_cnt = 0;
     waiting.oldest = txn->GetTransactionId();
     waiting.list.push_back(req);
     lock_table_[rid] = std::move(waiting);
   } else {
-    if (txn->GetTransactionId() > lock_table_[rid].oldest) {
+    if (lock_table_[rid].exclusive_cnt != 0 &&
+        txn->GetTransactionId() > lock_table_[rid].oldest) {
       txn->SetState(TransactionState::ABORTED);
       return false;
     }
-    lock_table_[rid].oldest = txn->GetTransactionId();
     lock_table_[rid].list.push_back(req);
   }
 
@@ -74,7 +75,8 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
     lock_table_[rid] = std::move(waiting);
   } else {
     // die
-    if (txn->GetTransactionId() > lock_table_[rid].oldest) {
+    if (lock_table_[rid].exclusive_cnt != 0 &&
+        txn->GetTransactionId() > lock_table_[rid].oldest) {
       txn->SetState(TransactionState::ABORTED);
       return false;
     }
@@ -82,6 +84,8 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
     lock_table_[rid].oldest = txn->GetTransactionId();
     lock_table_[rid].list.push_back(req);
   }
+
+  ++lock_table_[rid].exclusive_cnt;
 
   // must be first of the waiting list
   cond.wait(latch, [&]() -> bool {
@@ -142,18 +146,14 @@ bool LockManager::Unlock(Transaction *txn, const RID &rid) {
        it != lock_table_[rid].list.end(); ++it) {
     if (it->txn_id == txn->GetTransactionId()) {
       bool first = it == lock_table_[rid].list.begin();
-      bool last = it == --lock_table_[rid].list.end();
       bool exclusive = it->mode == LockMode::EXCLUSIVE;
 
+      if (exclusive) {
+        --lock_table_[rid].exclusive_cnt;
+      }
       lock_table_[rid].list.erase(it);
 
-      // update
-      if (last && !lock_table_[rid].list.empty()) {
-        auto end = --lock_table_[rid].list.end();
-        lock_table_[rid].oldest = end->txn_id;
-      }
-
-      // if it's first(shared) or exclusive, notify all
+      // if it's first(shared) or exclusive(must be the first), notify all
       if (first || exclusive) {
         cond.notify_all();
       }

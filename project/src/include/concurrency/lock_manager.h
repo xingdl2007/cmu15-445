@@ -28,7 +28,8 @@ class LockManager {
     bool granted = false;
   };
   struct Waiting {
-    txn_id_t oldest; // wait-die: txn older than `oldest`(<) can wait or die
+    size_t exclusive_cnt = 0;  // how many exclusive requests
+    txn_id_t oldest = -1;      // wait-die: txn older than `oldest`(<) can wait or die
     std::list<Request> list;
   };
 public:
