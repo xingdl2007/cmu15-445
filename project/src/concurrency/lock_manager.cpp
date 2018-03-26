@@ -142,8 +142,16 @@ bool LockManager::Unlock(Transaction *txn, const RID &rid) {
        it != lock_table_[rid].list.end(); ++it) {
     if (it->txn_id == txn->GetTransactionId()) {
       bool first = it == lock_table_[rid].list.begin();
+      bool last = it == --lock_table_[rid].list.end();
       bool exclusive = it->mode == LockMode::EXCLUSIVE;
+
       lock_table_[rid].list.erase(it);
+
+      // update
+      if (last && !lock_table_[rid].list.empty()) {
+        auto end = --lock_table_[rid].list.end();
+        lock_table_[rid].oldest = end->txn_id;
+      }
 
       // if it's first(shared) or exclusive, notify all
       if (first || exclusive) {
