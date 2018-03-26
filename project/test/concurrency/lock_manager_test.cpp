@@ -187,8 +187,13 @@ TEST(LockManagerTest, DeadlockTest3) {
     EXPECT_EQ(res, true);
     EXPECT_EQ(txn.GetState(), TransactionState::GROWING);
 
-    // unlock
+    // unlock rid1
     res = lock_mgr.Unlock(&txn, rid);
+    EXPECT_EQ(res, true);
+    EXPECT_EQ(txn.GetState(), TransactionState::SHRINKING);
+
+    // unblock rid2
+    res = lock_mgr.Unlock(&txn, rid2);
     EXPECT_EQ(res, true);
     EXPECT_EQ(txn.GetState(), TransactionState::SHRINKING);
   });
@@ -210,6 +215,9 @@ TEST(LockManagerTest, DeadlockTest3) {
     EXPECT_EQ(res, false);
     EXPECT_EQ(txn.GetState(), TransactionState::ABORTED);
 
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    // unlock rid
     res = lock_mgr.Unlock(&txn, rid);
 
     EXPECT_EQ(res, true);
