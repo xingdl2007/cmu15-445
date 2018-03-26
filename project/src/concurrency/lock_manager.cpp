@@ -28,6 +28,9 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
       txn->SetState(TransactionState::ABORTED);
       return false;
     }
+    if (lock_table_[rid].oldest > txn->GetTransactionId()) {
+      lock_table_[rid].oldest = txn->GetTransactionId();
+    }
     lock_table_[rid].list.push_back(req);
   }
 
@@ -75,8 +78,7 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
     lock_table_[rid] = std::move(waiting);
   } else {
     // die
-    if (lock_table_[rid].exclusive_cnt != 0 &&
-        txn->GetTransactionId() > lock_table_[rid].oldest) {
+    if (txn->GetTransactionId() > lock_table_[rid].oldest) {
       txn->SetState(TransactionState::ABORTED);
       return false;
     }
