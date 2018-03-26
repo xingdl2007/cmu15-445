@@ -23,6 +23,7 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
     lock_table_[rid] = std::move(waiting);
   } else {
     if (txn->GetTransactionId() > lock_table_[rid].oldest) {
+      txn->SetState(TransactionState::ABORTED);
       return false;
     }
     lock_table_[rid].oldest = txn->GetTransactionId();
@@ -50,6 +51,7 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
   // granted shared lock
   assert(cur != nullptr && cur->txn_id == txn->GetTransactionId());
   cur->granted = true;
+  txn->GetSharedLockSet()->insert(rid);
 
   // notify other threads
   cond.notify_all();
@@ -73,6 +75,7 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
   } else {
     // die
     if (txn->GetTransactionId() > lock_table_[rid].oldest) {
+      txn->SetState(TransactionState::ABORTED);
       return false;
     }
     // wait
@@ -87,7 +90,9 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
 
   // granted exclusive lock
   assert(lock_table_[rid].list.front().txn_id == txn->GetTransactionId());
+
   lock_table_[rid].list.front().granted = true;
+  txn->GetExclusiveLockSet()->insert(rid);
   return true;
 }
 
@@ -108,7 +113,10 @@ bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
   assert(lock_table_[rid].list.front().txn_id == txn->GetTransactionId() &&
       lock_table_[rid].list.front().mode == LockMode::SHARED &&
       lock_table_[rid].list.front().granted);
+
   lock_table_[rid].list.front().mode = LockMode::EXCLUSIVE;
+  txn->GetSharedLockSet()->erase(rid);
+  txn->GetExclusiveLockSet()->insert(rid);
   return true;
 }
 
@@ -118,8 +126,10 @@ bool LockManager::Unlock(Transaction *txn, const RID &rid) {
   // if strict 2pl, when unlock txn must be in committed or abort state
   if (strict_2PL_) {
     if (txn->GetState() != TransactionState::COMMITTED ||
-        txn->GetState() != TransactionState::ABORTED)
+        txn->GetState() != TransactionState::ABORTED) {
+      txn->SetState(TransactionState::ABORTED);
       return false;
+    }
   } else {
     if (txn->GetState() == TransactionState::GROWING) {
       // turn to shrinking state
