@@ -116,9 +116,13 @@ private:
 
   bool isSafe(BPlusTreePage *node, Operation op);
 
+  inline void lockRoot() { mutex_.lock(); }
+  inline void unlockRoot() { mutex_.unlock(); }
+
   // member variable
   std::string index_name_;
-  std::mutex mutex_;         // protect `root_page_id_` from concurrent modification
+  std::mutex mutex_;                       // protect `root_page_id_` from concurrent modification
+  static thread_local bool root_is_locked; // root is locked?
   page_id_t root_page_id_;
   BufferPoolManager *buffer_pool_manager_;
   KeyComparator comparator_;

@@ -22,12 +22,17 @@ BPlusTree(const std::string &name,
     : index_name_(name), root_page_id_(root_page_id),
       buffer_pool_manager_(buffer_pool_manager), comparator_(comparator) {}
 
+template <typename KeyType, typename ValueType, typename KeyComparator>
+thread_local bool BPlusTree<KeyType, ValueType, KeyComparator>::root_is_locked = false;
+
 /*
  * Helper function to decide whether current b+tree is empty
  */
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool BPlusTree<KeyType, ValueType, KeyComparator>::
-IsEmpty() const { return root_page_id_ == INVALID_PAGE_ID; }
+IsEmpty() const {
+  return root_page_id_ == INVALID_PAGE_ID;
+}
 
 /*****************************************************************************
  * SEARCH
@@ -42,7 +47,7 @@ bool BPlusTree<KeyType, ValueType, KeyComparator>::
 GetValue(const KeyType &key, std::vector<ValueType> &result,
          Transaction *transaction) {
   // for debug
-  __attribute__((unused)) auto checker = Checker{buffer_pool_manager_};
+  //__attribute__((unused)) auto checker = Checker{buffer_pool_manager_};
 
   auto *leaf = FindLeafPage(key, false, Operation::READONLY, transaction);
   bool ret = false;
@@ -81,11 +86,16 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 bool BPlusTree<KeyType, ValueType, KeyComparator>::
 Insert(const KeyType &key, const ValueType &value, Transaction *transaction) {
   // for debug
-  __attribute__((unused)) auto checker = Checker{buffer_pool_manager_};
+  //__attribute__((unused)) auto checker = Checker{buffer_pool_manager_};
 
-  if (IsEmpty()) {
-    StartNewTree(key, value);
-    return true;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (IsEmpty()) {
+      //std::cerr << "thread: " << transaction->GetThreadId()
+      //          << ", insert key: " << key << std::endl;
+      StartNewTree(key, value);
+      return true;
+    }
   }
   return InsertIntoLeaf(key, value, transaction);
 }
@@ -99,8 +109,6 @@ Insert(const KeyType &key, const ValueType &value, Transaction *transaction) {
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void BPlusTree<KeyType, ValueType, KeyComparator>::
 StartNewTree(const KeyType &key, const ValueType &value) {
-  std::lock_guard<std::mutex> lock(mutex_);
-
   auto *page = buffer_pool_manager_->NewPage(root_page_id_);
   if (page == nullptr) {
     throw Exception(EXCEPTION_TYPE_INDEX,
@@ -137,9 +145,14 @@ InsertIntoLeaf(const KeyType &key, const ValueType &value, Transaction *transact
   // if already in the tree, return false
   ValueType v;
   if (leaf->Lookup(key, v, comparator_)) {
+    //std::cerr << "thread: " << transaction->GetThreadId() << ", key: " << key
+    //          << " already exists" << std::endl;
     UnlockUnpinPages(Operation::INSERT, transaction);
     return false;
   }
+
+  //std::cerr << "thread: " << transaction->GetThreadId()
+  //          << ", insert key: " << key << std::endl;
 
   if (leaf->GetSize() < leaf->GetMaxSize()) {
     leaf->Insert(key, value, comparator_);
@@ -208,8 +221,6 @@ void BPlusTree<KeyType, ValueType, KeyComparator>::
 InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
                  BPlusTreePage *new_node, Transaction *transaction) {
   if (old_node->IsRootPage()) {
-    std::lock_guard<std::mutex> lock(mutex_);
-
     auto *page = buffer_pool_manager_->NewPage(root_page_id_);
     if (page == nullptr) {
       throw Exception(EXCEPTION_TYPE_INDEX,
@@ -281,7 +292,7 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
         }
       }
 
-      // `internal2` will move GetSize()+1)/2 pairs from `copy`
+      // `internal2` will move (GetSize()+1)/2 pairs from `copy`
       assert(copy->GetSize() == copy->GetMaxSize());
       auto internal2 =
           Split<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>>(copy);
@@ -333,7 +344,7 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 void BPlusTree<KeyType, ValueType, KeyComparator>::
 Remove(const KeyType &key, Transaction *transaction) {
   // for debug
-  __attribute__((unused)) auto checker = Checker{buffer_pool_manager_};
+  //__attribute__((unused)) auto checker = Checker{buffer_pool_manager_};
 
   if (IsEmpty()) {
     return;
@@ -528,8 +539,6 @@ Redistribute(N *neighbor_node, N *node, int index) {
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool BPlusTree<KeyType, ValueType, KeyComparator>::
 AdjustRoot(BPlusTreePage *old_root_node) {
-  std::lock_guard<std::mutex> lock(mutex_);
-
   // root is a leaf node, case 2
   if (old_root_node->IsLeafPage()) {
     if (old_root_node->GetSize() == 0) {
@@ -611,9 +620,14 @@ UnlockUnpinPages(Operation op, Transaction *transaction) {
     return;
   }
 
-  //
+  // if root is locked, unlock it
+  if (root_is_locked) {
+    root_is_locked = false;
+    unlockRoot();
+  }
+
   for (auto *page:*transaction->GetPageSet()) {
-    assert(page->GetPinCount() == 1);
+    //assert(page->GetPinCount() == 1);
     if (op == Operation::READONLY) {
       page->RUnlatch();
       buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
@@ -670,6 +684,11 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *
 BPlusTree<KeyType, ValueType, KeyComparator>::
 FindLeafPage(const KeyType &key, bool leftMost, Operation op, Transaction *transaction) {
+  if (op != Operation::READONLY) {
+    lockRoot();
+    root_is_locked = true;
+  }
+
   // empty B+ tree?
   if (IsEmpty()) {
     return nullptr;
@@ -686,6 +705,8 @@ FindLeafPage(const KeyType &key, bool leftMost, Operation op, Transaction *trans
     parent->RLatch();
   } else {
     parent->WLatch();
+    //std::cerr << "thread: " << transaction->GetThreadId() << ", page "
+    //          << parent->GetPageId() << ": X lock, key: " << key << std::endl;
   }
   if (transaction != nullptr) {
     transaction->AddIntoPageSet(parent);

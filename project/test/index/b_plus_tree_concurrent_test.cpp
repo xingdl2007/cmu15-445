@@ -122,6 +122,8 @@ TEST(BPlusTreeConcurrentTest, InsertTest1) {
   }
   LaunchParallelTest(2, InsertHelper, std::ref(tree), keys);
 
+  //std::cerr << tree.ToString(false) << std::endl;
+
   std::vector<RID> rids;
   GenericKey<8> index_key;
   for (auto key : keys) {
