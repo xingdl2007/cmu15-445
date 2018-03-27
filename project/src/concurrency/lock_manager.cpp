@@ -34,7 +34,7 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
 
   // maybe blocked
   Request *cur = nullptr;
-  lock_table_[rid].cond.wait(latch, [&]() -> bool {
+  cond.wait(latch, [&]() -> bool {
     // all requests before this one are shared and granted
     bool all_shared = true, all_granted = true;
     for (auto &r: lock_table_[rid].list) {
@@ -56,7 +56,7 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
   txn->GetSharedLockSet()->insert(rid);
 
   // notify other threads
-  lock_table_[rid].cond.notify_all();
+  cond.notify_all();
   return true;
 }
 
@@ -86,7 +86,7 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
   ++lock_table_[rid].exclusive_cnt;
 
   // must be first of the waiting list
-  lock_table_[rid].cond.wait(latch, [&]() -> bool {
+  cond.wait(latch, [&]() -> bool {
     return lock_table_[rid].list.front().txn_id == txn->GetTransactionId();
   });
 
@@ -131,7 +131,7 @@ bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
   lock_table_[rid].list.erase(src);
 
   // maybe blocked
-  lock_table_[rid].cond.wait(latch, [&]() -> bool {
+  cond.wait(latch, [&]() -> bool {
     return lock_table_[rid].list.front().txn_id == txn->GetTransactionId();
   });
 
@@ -177,7 +177,7 @@ bool LockManager::Unlock(Transaction *txn, const RID &rid) {
 
       // if it's first(shared) or exclusive(must be the first), notify all
       if (first || exclusive) {
-        lock_table_[rid].cond.notify_all();
+        cond.notify_all();
       }
       break;
     }
