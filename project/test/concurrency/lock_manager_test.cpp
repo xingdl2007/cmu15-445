@@ -142,6 +142,81 @@ TEST(LockManagerTest, BasicShareTest) {
   t6.join();
 }
 
+TEST(LockManagerTest, BasicExclusiveTest) {
+  LockManager lock_mgr{false};
+  TransactionManager txn_mgr{&lock_mgr};
+  RID rid{0, 0};
+
+  std::promise<void> go, p0, p1, p2;
+  std::shared_future<void> ready(go.get_future());
+
+  std::thread t0([&, ready] {
+    Transaction txn(5);
+    bool res = lock_mgr.LockExclusive(&txn, rid);
+
+    p0.set_value();
+    ready.wait();
+
+    EXPECT_EQ(res, true);
+    EXPECT_EQ(txn.GetState(), TransactionState::GROWING);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    res = lock_mgr.Unlock(&txn, rid);
+    EXPECT_EQ(res, true);
+    EXPECT_EQ(txn.GetState(), TransactionState::SHRINKING);
+  });
+
+  std::thread t1([&, ready] {
+    Transaction txn(3);
+
+    p1.set_value();
+    ready.wait();
+
+    bool res = lock_mgr.LockShared(&txn, rid);
+
+    EXPECT_EQ(res, true);
+    EXPECT_EQ(txn.GetState(), TransactionState::GROWING);
+
+    res = lock_mgr.Unlock(&txn, rid);
+
+    EXPECT_EQ(res, true);
+    EXPECT_EQ(txn.GetState(), TransactionState::SHRINKING);
+
+  });
+
+  std::thread t2([&, ready] {
+    Transaction txn(1);
+
+    p2.set_value();
+    ready.wait();
+
+    // wait for t1
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    bool res = lock_mgr.LockShared(&txn, rid);
+
+    EXPECT_EQ(res, true);
+    EXPECT_EQ(txn.GetState(), TransactionState::GROWING);
+
+    res = lock_mgr.Unlock(&txn, rid);
+
+    EXPECT_EQ(res, true);
+    EXPECT_EQ(txn.GetState(), TransactionState::SHRINKING);
+
+  });
+
+  p0.get_future().wait();
+  p1.get_future().wait();
+  p2.get_future().wait();
+
+  go.set_value();
+
+  t0.join();
+  t1.join();
+  t2.join();
+}
+
 TEST(LockManagerTest, BasicTest1) {
   LockManager lock_mgr{false};
   TransactionManager txn_mgr{&lock_mgr};
