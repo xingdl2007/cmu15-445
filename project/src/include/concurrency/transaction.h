@@ -103,10 +103,12 @@ public:
 
 private:
   TransactionState state_;
+
   // thread id, single-threaded transactions
   std::thread::id thread_id_;
   // transaction id
   txn_id_t txn_id_;
+
   // Below are used by transaction, undo set
   std::shared_ptr<std::deque<WriteRecord>> write_set_;
   // prev lsn

@@ -23,6 +23,8 @@ namespace cmudb {
 
 #define BPLUSTREE_TYPE BPlusTree<KeyType, ValueType, KeyComparator>
 
+enum class Operation { READONLY = 0, INSERT, DELETE };
+
 // Main class providing the API for the Interactive B+ Tree.
 template <typename KeyType, typename ValueType, typename KeyComparator>
 class BPlusTree {
@@ -63,7 +65,9 @@ public:
 
   // expose for test purpose
   BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *
-  FindLeafPage(const KeyType &key, bool leftMost = false);
+  FindLeafPage(const KeyType &key, bool leftMost = false,
+               Operation op = Operation::READONLY,
+               Transaction *transaction = nullptr);
 
 private:
   class Checker {
@@ -106,6 +110,11 @@ private:
   bool AdjustRoot(BPlusTreePage *node);
 
   void UpdateRootPageId(bool insert_record = false);
+
+  // unlock all parents
+  void UnlockUnpinPages(Operation op, Transaction *transaction);
+
+  bool isSafe(BPlusTreePage *node, Operation op);
 
   // member variable
   std::string index_name_;
