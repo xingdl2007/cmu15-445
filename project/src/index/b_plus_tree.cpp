@@ -345,12 +345,8 @@ Remove(const KeyType &key, Transaction *transaction) {
     leaf->RemoveAndDeleteRecord(key, comparator_);
 
     if (CoalesceOrRedistribute(leaf, transaction)) {
-      buffer_pool_manager_->UnpinPage(leaf->GetPageId(), false);
-      buffer_pool_manager_->DeletePage(leaf->GetPageId());
-    } else {
-      buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
+      transaction->AddIntoDeletedPageSet(leaf->GetPageId());
     }
-
     UnlockUnpinPages(Operation::INSERT, transaction);
   }
 }
@@ -410,6 +406,10 @@ CoalesceOrRedistribute(N *node, Transaction *transaction) {
     throw Exception(EXCEPTION_TYPE_INDEX,
                     "all page are pinned while CoalesceOrRedistribute");
   }
+
+  // put sibling node to PageSet
+  page->WLatch();
+  transaction->AddIntoPageSet(page);
   auto sibling = reinterpret_cast<N *>(page->GetData());
   bool redistribute = false;
 
@@ -420,7 +420,6 @@ CoalesceOrRedistribute(N *node, Transaction *transaction) {
   // 3. but the condition for leaf/internal node is same
   if (sibling->GetSize() + node->GetSize() > node->GetMaxSize()) {
     redistribute = true;
-
     // release parent
     buffer_pool_manager_->UnpinPage(parent->GetPageId(), true);
   }
@@ -432,25 +431,26 @@ CoalesceOrRedistribute(N *node, Transaction *transaction) {
     } else {
       Redistribute<N>(sibling, node, 1);   // sibling is predecessor of node
     }
-    buffer_pool_manager_->UnpinPage(sibling->GetPageId(), true);
     return false;
   }
 
   // merge nodes: if node is the first child of its parent, swap node and
   // its sibling when call Coalesce for the assumption
+  bool ret;
   if (value_index == 0) {
     // it's Coalesce's responsibility to delete/save parent
     Coalesce<N>(node, sibling, parent, 1, transaction);
-    buffer_pool_manager_->UnpinPage(sibling_page_id, false);
-    buffer_pool_manager_->DeletePage(sibling_page_id);
+    transaction->AddIntoDeletedPageSet(sibling_page_id);
     // node should not be deleted
-    return false;
+    ret = false;
   } else {
     Coalesce<N>(sibling, node, parent, value_index, transaction);
-    buffer_pool_manager_->UnpinPage(sibling_page_id, true);
     // node should be deleted
-    return true;
+    ret = true;
   }
+  // release parent
+  buffer_pool_manager_->UnpinPage(parent->GetPageId(), true);
+  return ret;
 }
 
 /*
@@ -479,12 +479,8 @@ Coalesce(N *neighbor_node, N *node,
   parent->Remove(index);
 
   // recursive
-  page_id_t page_id = parent->GetPageId();
   if (CoalesceOrRedistribute(parent, transaction)) {
-    buffer_pool_manager_->UnpinPage(page_id, false);
-    buffer_pool_manager_->DeletePage(page_id);
-  } else {
-    buffer_pool_manager_->UnpinPage(page_id, true);
+    transaction->AddIntoDeletedPageSet(parent->GetPageId());
   }
 }
 
@@ -606,6 +602,7 @@ Begin(const KeyType &key) {
  *****************************************************************************/
 /*
  * Unlock all nodes current transaction hold according to op then unpin pages
+ * and delete all pages if any
  */
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void BPlusTree<KeyType, ValueType, KeyComparator>::
@@ -613,6 +610,8 @@ UnlockUnpinPages(Operation op, Transaction *transaction) {
   if (transaction == nullptr) {
     return;
   }
+
+  //
   for (auto *page:*transaction->GetPageSet()) {
     assert(page->GetPinCount() == 1);
     if (op == Operation::READONLY) {
@@ -624,6 +623,12 @@ UnlockUnpinPages(Operation op, Transaction *transaction) {
     }
   }
   transaction->GetPageSet()->clear();
+
+  // delete all pages
+  for (auto page_id: *transaction->GetDeletedPageSet()) {
+    buffer_pool_manager_->DeletePage(page_id);
+  }
+  transaction->GetDeletedPageSet()->clear();
 }
 
 /*
