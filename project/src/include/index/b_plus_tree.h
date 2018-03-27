@@ -109,6 +109,7 @@ private:
 
   // member variable
   std::string index_name_;
+  std::mutex mutex_;         // protect `root_page_id_` from concurrent modification
   page_id_t root_page_id_;
   BufferPoolManager *buffer_pool_manager_;
   KeyComparator comparator_;

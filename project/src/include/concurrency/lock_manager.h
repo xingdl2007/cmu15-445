@@ -31,6 +31,7 @@ class LockManager {
     size_t exclusive_cnt = 0;  // how many exclusive requests
     txn_id_t oldest = -1;      // wait-die: txn older than `oldest`(<) can wait or die
     std::list<Request> list;
+    std::condition_variable cond;
   };
 public:
   explicit LockManager(bool strict_2PL) : strict_2PL_(strict_2PL) {};
