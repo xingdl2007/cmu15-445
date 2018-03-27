@@ -110,17 +110,41 @@ bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
   // must be in growing state
   assert(txn->GetState() == TransactionState::GROWING);
 
+  // 1. move cur request to the end of `shared` period
+  // 2. change granted to false
+  // 3. change lock mode to EXCLUSIVE
+  auto src = lock_table_[rid].list.end(), tgt = src;
+  for (auto it = lock_table_[rid].list.begin();
+       it != lock_table_[rid].list.end(); ++it) {
+    if (it->txn_id == txn->GetTransactionId()) {
+      src = it;
+    }
+    if (src != lock_table_[rid].list.end()) {
+      if (it->mode == LockMode::EXCLUSIVE) {
+        tgt = it;
+        break;
+      }
+    }
+  }
+  assert(src != lock_table_[rid].list.end());
+  Request req = *src;
+  req.granted = false;
+  req.mode = LockMode::EXCLUSIVE;
+
+  lock_table_[rid].list.insert(tgt, req);
+  lock_table_[rid].list.erase(src);
+
   // maybe blocked
   cond.wait(latch, [&]() -> bool {
     return lock_table_[rid].list.front().txn_id == txn->GetTransactionId();
   });
 
-  // upgrade to  lock
+  // upgrade to exclusive lock
   assert(lock_table_[rid].list.front().txn_id == txn->GetTransactionId() &&
-      lock_table_[rid].list.front().mode == LockMode::SHARED &&
-      lock_table_[rid].list.front().granted);
+      lock_table_[rid].list.front().mode == LockMode::EXCLUSIVE);
 
-  lock_table_[rid].list.front().mode = LockMode::EXCLUSIVE;
+  lock_table_[rid].list.front().granted = true;
+
   txn->GetSharedLockSet()->erase(rid);
   txn->GetExclusiveLockSet()->insert(rid);
   return true;

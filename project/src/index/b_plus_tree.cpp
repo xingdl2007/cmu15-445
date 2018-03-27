@@ -42,7 +42,7 @@ bool BPlusTree<KeyType, ValueType, KeyComparator>::
 GetValue(const KeyType &key, std::vector<ValueType> &result,
          Transaction *transaction) {
   // for debug
-  __attribute__((unused)) auto checker = Checker{buffer_pool_manager_};
+  //__attribute__((unused)) auto checker = Checker{buffer_pool_manager_};
 
   auto *leaf = FindLeafPage(key, false);
   bool ret = false;
@@ -71,7 +71,7 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 bool BPlusTree<KeyType, ValueType, KeyComparator>::
 Insert(const KeyType &key, const ValueType &value, Transaction *transaction) {
   // for debug
-  __attribute__((unused)) auto checker = Checker{buffer_pool_manager_};
+  //__attribute__((unused)) auto checker = Checker{buffer_pool_manager_};
 
   if (IsEmpty()) {
     StartNewTree(key, value);
@@ -325,7 +325,7 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 void BPlusTree<KeyType, ValueType, KeyComparator>::
 Remove(const KeyType &key, Transaction *transaction) {
   // for debug
-  __attribute__((unused)) auto checker = Checker{buffer_pool_manager_};
+  //__attribute__((unused)) auto checker = Checker{buffer_pool_manager_};
 
   if (IsEmpty()) {
     return;
