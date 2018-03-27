@@ -53,6 +53,16 @@ GetValue(const KeyType &key, std::vector<ValueType> &result,
       ret = true;
     }
     UnlockUnpinPages(Operation::READONLY, transaction);
+
+    // in case of `transaction` is nullptr
+    if (transaction == nullptr) {
+      auto page_id = leaf->GetPageId();
+      // unlock and unpin
+      buffer_pool_manager_->FetchPage(page_id)->RUnlatch();
+      buffer_pool_manager_->UnpinPage(page_id, false);
+      // unpin again
+      buffer_pool_manager_->UnpinPage(page_id, false);
+    }
   }
   return ret;
 }
@@ -127,13 +137,12 @@ InsertIntoLeaf(const KeyType &key, const ValueType &value, Transaction *transact
   // if already in the tree, return false
   ValueType v;
   if (leaf->Lookup(key, v, comparator_)) {
-    buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
+    UnlockUnpinPages(Operation::INSERT, transaction);
     return false;
   }
 
   if (leaf->GetSize() < leaf->GetMaxSize()) {
     leaf->Insert(key, value, comparator_);
-    buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
   } else {
     // when leaf node can hold even number of key-value pairs
     // the following method is ok, but if the leaf node can hold
@@ -219,7 +228,6 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
     // update to new 'root_page_id'
     UpdateRootPageId(false);
 
-    buffer_pool_manager_->UnpinPage(old_node->GetPageId(), true);
     buffer_pool_manager_->UnpinPage(new_node->GetPageId(), true);
 
     // parent is done
@@ -231,7 +239,6 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
       throw Exception(EXCEPTION_TYPE_INDEX,
                       "all page are pinned while InsertIntoParent");
     }
-    assert(page->GetPinCount() == 1);
     auto internal =
         reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t,
                                                KeyComparator> *>(page->GetData());
@@ -242,12 +249,7 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
       new_node->SetParentPageId(internal->GetPageId());
 
       // new_node is split from old_node, must be dirty
-      buffer_pool_manager_->UnpinPage(old_node->GetPageId(), true);
       buffer_pool_manager_->UnpinPage(new_node->GetPageId(), true);
-
-      // internal is also done
-      buffer_pool_manager_->UnpinPage(internal->GetPageId(), true);
-
     } else {
       // internal have no space and have to split
       // first make a copy of internal node, simplify split process
@@ -302,8 +304,7 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
         old_node->SetParentPageId(internal2->GetPageId());
       }
 
-      // old_node and new_node is done, unpin them
-      buffer_pool_manager_->UnpinPage(old_node->GetPageId(), true);
+      // new_node is done, unpin it
       buffer_pool_manager_->UnpinPage(new_node->GetPageId(), true);
 
       // delete copy
@@ -313,6 +314,8 @@ InsertIntoParent(BPlusTreePage *old_node, const KeyType &key,
       // recursive call until root if necessary
       InsertIntoParent(internal, internal2->KeyAt(0), internal2);
     }
+
+    buffer_pool_manager_->UnpinPage(internal->GetPageId(), true);
   }
 }
 
@@ -611,13 +614,16 @@ UnlockUnpinPages(Operation op, Transaction *transaction) {
     return;
   }
   for (auto *page:*transaction->GetPageSet()) {
+    assert(page->GetPinCount() == 1);
     if (op == Operation::READONLY) {
       page->RUnlatch();
+      buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
     } else {
       page->WUnlatch();
+      buffer_pool_manager_->UnpinPage(page->GetPageId(), true);
     }
-    buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
   }
+  transaction->GetPageSet()->clear();
 }
 
 /*
@@ -670,13 +676,14 @@ FindLeafPage(const KeyType &key, bool leftMost, Operation op, Transaction *trans
     throw Exception(EXCEPTION_TYPE_INDEX,
                     "all page are pinned while FindLeafPage");
   }
+
   if (op == Operation::READONLY) {
     parent->RLatch();
   } else {
     parent->WLatch();
   }
   if (transaction != nullptr) {
-    transaction->GetPageSet()->push_back(parent);
+    transaction->AddIntoPageSet(parent);
   }
 
   // Uniform page -> BPlusTree page
@@ -713,11 +720,17 @@ FindLeafPage(const KeyType &key, bool leftMost, Operation op, Transaction *trans
     assert(node->GetParentPageId() == parent_page_id);
 
     // is child node safe ?
-    if (isSafe(node, op)) {
+    if (op != Operation::READONLY && isSafe(node, op)) {
       UnlockUnpinPages(op, transaction);
     }
     if (transaction != nullptr) {
-      transaction->GetPageSet()->push_back(child);
+      //transaction->GetPageSet()->push_back(child);
+      transaction->AddIntoPageSet(child);
+    } else {
+      // for Index Iterator
+      parent->RUnlatch();
+      buffer_pool_manager_->UnpinPage(parent->GetPageId(), false);
+      parent = child;
     }
   }
   return reinterpret_cast<BPlusTreeLeafPage<KeyType,

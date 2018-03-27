@@ -117,6 +117,7 @@ private:
   // Below are used by concurrent index
   // this deque contains page pointer that was latched during index operation
   std::shared_ptr<std::deque<Page *>> page_set_;
+
   // this set contains page_id that was deleted during index operation
   std::shared_ptr<std::unordered_set<page_id_t>> deleted_page_set_;
 
