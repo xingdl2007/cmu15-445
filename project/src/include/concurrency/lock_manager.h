@@ -58,7 +58,6 @@ public:
 private:
   bool strict_2PL_;
   std::mutex mutex_;
-  std::condition_variable cond;
   std::unordered_map<RID, Waiting> lock_table_;
 };
 
