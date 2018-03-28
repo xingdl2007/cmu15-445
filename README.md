@@ -6,7 +6,7 @@
 
 - [x] Project 2 - B+Tree
 
-- [ ] Project 3 - Concurrency Control
+- [x] Project 3 - Concurrency Control
 
 - [ ] Project 4 - Logging & Recovery
 
