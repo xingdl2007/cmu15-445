@@ -350,10 +350,6 @@ TEST(BPlusTreeConcurrentTest, MixTest) {
   remove("test.log");
 }
 
-void hello() {
-
-}
-
 TEST(BPlusTreeConcurrentTest, MixTest2) {
   // create KeyComparator and index schema
   Schema *key_schema = ParseCreateStatement("a bigint");
@@ -387,7 +383,7 @@ TEST(BPlusTreeConcurrentTest, MixTest2) {
   // concurrent insert and delete
   std::thread t0(InsertHelper, std::ref(tree), keys, 0);
   LaunchParallelTest(4, DeleteHelperSplit, std::ref(tree), std::ref(all_deleted), 4);
-  
+
   t0.join();
 
   std::vector<RID> rids;
