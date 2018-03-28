@@ -353,12 +353,19 @@ Remove(const KeyType &key, Transaction *transaction) {
   // find the leaf node
   auto *leaf = FindLeafPage(key, false, Operation::DELETE, transaction);
   if (leaf != nullptr) {
-    leaf->RemoveAndDeleteRecord(key, comparator_);
-
-    if (CoalesceOrRedistribute(leaf, transaction)) {
-      transaction->AddIntoDeletedPageSet(leaf->GetPageId());
+    int size_before_deletion = leaf->GetSize();
+    if (leaf->RemoveAndDeleteRecord(key, comparator_) != size_before_deletion) {
+      //std::cerr << "thread: " << transaction->GetThreadId()
+      //          << ", remove key: " << key << ", root locked: "
+      //          << root_is_locked << std::endl;
+      if (CoalesceOrRedistribute(leaf, transaction)) {
+        transaction->AddIntoDeletedPageSet(leaf->GetPageId());
+      }
+    } else {
+      //std::cerr << "thread: " << transaction->GetThreadId()
+      //          << ", key not exists: " << key << std::endl;
     }
-    UnlockUnpinPages(Operation::INSERT, transaction);
+    UnlockUnpinPages(Operation::DELETE, transaction);
   }
 }
 
@@ -620,12 +627,6 @@ UnlockUnpinPages(Operation op, Transaction *transaction) {
     return;
   }
 
-  // if root is locked, unlock it
-  if (root_is_locked) {
-    root_is_locked = false;
-    unlockRoot();
-  }
-
   for (auto *page:*transaction->GetPageSet()) {
     //assert(page->GetPinCount() == 1);
     if (op == Operation::READONLY) {
@@ -643,36 +644,27 @@ UnlockUnpinPages(Operation op, Transaction *transaction) {
     buffer_pool_manager_->DeletePage(page_id);
   }
   transaction->GetDeletedPageSet()->clear();
+
+  // if root is locked, unlock it
+  if (root_is_locked) {
+    root_is_locked = false;
+    unlockRoot();
+  }
 }
 
 /*
  * Note: leaf node and internal node have different MAXSIZE
  */
 template <typename KeyType, typename ValueType, typename KeyComparator>
+template <typename N>
 bool BPlusTree<KeyType, ValueType, KeyComparator>::
-isSafe(BPlusTreePage *node, Operation op) {
-  if (node->IsLeafPage()) {
-    auto leaf =
-        reinterpret_cast<BPlusTreeLeafPage<KeyType, page_id_t,
-                                           KeyComparator> *>(node);
-    if (op == Operation::INSERT) {
-      return leaf->GetSize() < leaf->GetMaxSize();
-    } else if (op == Operation::DELETE) {
-      // >=: keep same with `coalesce logic`
-      return leaf->GetSize() >= leaf->GetMinSize();
-    }
-  } else {
-    auto internal =
-        reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t,
-                                               KeyComparator> *>(node);
-    if (op == Operation::INSERT) {
-      return internal->GetSize() < internal->GetMaxSize();
-    } else if (op == Operation::DELETE) {
-      // >: keep same with `coalesce logic`
-      return internal->GetSize() > internal->GetMinSize();
-    }
+isSafe(N *node, Operation op) {
+  if (op == Operation::INSERT) {
+    return node->GetSize() < node->GetMaxSize();
+  } else if (op == Operation::DELETE) {
+    // >=: keep same with `coalesce logic`
+    return node->GetSize() > node->GetMinSize() + 1;
   }
-  // should not be here
   return true;
 }
 
@@ -705,8 +697,10 @@ FindLeafPage(const KeyType &key, bool leftMost, Operation op, Transaction *trans
     parent->RLatch();
   } else {
     parent->WLatch();
-    //std::cerr << "thread: " << transaction->GetThreadId() << ", page "
-    //          << parent->GetPageId() << ": X lock, key: " << key << std::endl;
+    //if (op == Operation::DELETE) {
+    //  std::cerr << "thread: " << transaction->GetThreadId() << ", page "
+    //            << parent->GetPageId() << ": X lock, key: " << key << std::endl;
+    //}
   }
   if (transaction != nullptr) {
     transaction->AddIntoPageSet(parent);
@@ -740,6 +734,10 @@ FindLeafPage(const KeyType &key, bool leftMost, Operation op, Transaction *trans
     } else {
       // acquire X lock
       child->WLatch();
+      //if (op == Operation::DELETE) {
+      //  std::cerr << "thread: " << transaction->GetThreadId() << ", page "
+      //            << child->GetPageId() << ": X lock, key: " << key << std::endl;
+      //}
     }
     // sanity check, parent page id must match
     node = reinterpret_cast<BPlusTreePage *>(child->GetData());

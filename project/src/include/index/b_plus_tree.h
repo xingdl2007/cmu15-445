@@ -114,7 +114,8 @@ private:
   // unlock all parents
   void UnlockUnpinPages(Operation op, Transaction *transaction);
 
-  bool isSafe(BPlusTreePage *node, Operation op);
+  template <typename N>
+  bool isSafe(N *node, Operation op);
 
   inline void lockRoot() { mutex_.lock(); }
   inline void unlockRoot() { mutex_.unlock(); }
