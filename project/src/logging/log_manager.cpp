@@ -21,9 +21,7 @@ void LogManager::RunFlushThread() {
         std::unique_lock<std::mutex> lock(latch_);
         // timeout?
         if (cv_.wait_for(lock, LOG_TIMEOUT) == std::cv_status::timeout) {
-          std::swap(log_buffer_, flush_buffer_);
-          offset_ = 0;
-          flush_lsn_ = next_lsn_ - 1;
+          swapBuffer();
         }
         lock.unlock();
 
@@ -47,6 +45,26 @@ void LogManager::StopFlushThread() {
       flush_thread_->join();
     }
   }
+}
+
+/*
+ * should be called when holding the lock
+ */
+inline void LogManager::swapBuffer() {
+  std::swap(log_buffer_, flush_buffer_);
+  offset_ = 0;
+  flush_lsn_ = next_lsn_ - 1;
+}
+
+/*
+ * wake up flush thread, only called by buffer pool manager
+ * when it wants to force flush
+ */
+void LogManager::WakeupFlushThread() {
+  std::lock_guard<std::mutex> lock(latch_);
+  swapBuffer();
+  // wake up flush thread
+  cv_.notify_one();
 }
 
 /*
@@ -74,9 +92,7 @@ lsn_t LogManager::AppendLogRecord(LogRecord &log_record) {
 
   // log_buffer is almost full?
   if (offset_ + log_record.size_ > LOG_BUFFER_SIZE) {
-    std::swap(log_buffer_, flush_buffer_);
-    offset_ = 0;
-    flush_lsn_ = next_lsn_ - 1;
+    swapBuffer();
 
     // wake up flush thread
     cv_.notify_one();

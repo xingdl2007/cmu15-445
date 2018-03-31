@@ -45,7 +45,11 @@ public:
   inline void SetPersistentLSN(lsn_t lsn) { persistent_lsn_ = lsn; }
   inline char *GetLogBuffer() { return log_buffer_; }
 
+  void WakeupFlushThread();
+
 private:
+  inline void swapBuffer();
+
   // last log records in the flush_buffer_;
   lsn_t flush_lsn_;
 
