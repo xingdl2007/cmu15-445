@@ -1,8 +1,8 @@
 /**
  * log_record.h
- * For every write opeartion on table page, you should write ahead a
+ * For every write operation on table page, you should write ahead a
  * corresponding log record.
- * For EACH log record, HEADER is like (5 fields in common, 20 bytes in totoal)
+ * For EACH log record, HEADER is like (5 fields in common, 20 bytes in total)
  *-------------------------------------------------------------
  * | size | LSN | transID | prevLSN | LogType |
  *-------------------------------------------------------------
@@ -24,13 +24,16 @@
  * | HEADER | prev_page_id |
  *-------------------------------------------------------------
  */
+
 #pragma once
+
 #include <cassert>
 
 #include "common/config.h"
 #include "table/tuple.h"
 
 namespace cmudb {
+
 // log record type
 enum class LogRecordType {
   INVALID = 0,
@@ -42,8 +45,7 @@ enum class LogRecordType {
   BEGIN,
   COMMIT,
   ABORT,
-  // when create a new page in heap table
-  NEWPAGE,
+  NEWPAGE,  // when create a new page in heap table
 };
 
 class LogRecord {
@@ -70,8 +72,8 @@ public:
       insert_tuple_ = tuple;
     } else {
       assert(log_record_type == LogRecordType::APPLYDELETE ||
-             log_record_type == LogRecordType::MARKDELETE ||
-             log_record_type == LogRecordType::ROLLBACKDELETE);
+          log_record_type == LogRecordType::MARKDELETE ||
+          log_record_type == LogRecordType::ROLLBACKDELETE);
       delete_rid_ = rid;
       delete_tuple_ = tuple;
     }
@@ -88,7 +90,7 @@ public:
         old_tuple_(old_tuple), new_tuple_(new_tuple) {
     // calculate log record size
     size_ = HEADER_SIZE + sizeof(RID) + old_tuple.GetLength() +
-            new_tuple.GetLength() + 2 * sizeof(int32_t);
+        new_tuple.GetLength() + 2*sizeof(int32_t);
   }
 
   // constructor for NEWPAGE type
@@ -129,7 +131,7 @@ public:
        << "LSN:" << lsn_ << ", "
        << "transID:" << txn_id_ << ", "
        << "prevLSN:" << prev_lsn_ << ", "
-       << "LogType:" << (int)log_record_type_ << "]";
+       << "LogType:" << (int) log_record_type_ << "]";
 
     return os.str();
   }
@@ -137,26 +139,27 @@ public:
 private:
   // the length of log record(for serialization, in bytes)
   int32_t size_ = 0;
+
   // must have fields
   lsn_t lsn_ = INVALID_LSN;
   txn_id_t txn_id_ = INVALID_TXN_ID;
   lsn_t prev_lsn_ = INVALID_LSN;
   LogRecordType log_record_type_ = LogRecordType::INVALID;
 
-  // case1: for delete opeartion, delete_tuple_ for UNDO opeartion
+  // case1: for delete operation, delete_tuple_ for UNDO operation
   RID delete_rid_;
   Tuple delete_tuple_;
 
-  // case2: for insert opeartion
+  // case2: for insert operation
   RID insert_rid_;
   Tuple insert_tuple_;
 
-  // case3: for update opeartion
+  // case3: for update operation
   RID update_rid_;
   Tuple old_tuple_;
   Tuple new_tuple_;
 
-  // case4: for new page opeartion
+  // case4: for new page operation
   page_id_t prev_page_id_ = INVALID_PAGE_ID;
   const static int HEADER_SIZE = 20;
 }; // namespace cmudb

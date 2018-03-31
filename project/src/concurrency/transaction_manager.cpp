@@ -2,10 +2,12 @@
  * transaction_manager.cpp
  *
  */
+
 #include "concurrency/transaction_manager.h"
 #include "table/table_heap.h"
 
 #include <cassert>
+
 namespace cmudb {
 
 Transaction *TransactionManager::Begin() {

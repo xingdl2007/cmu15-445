@@ -6,6 +6,7 @@
  */
 
 #pragma once
+
 #include <algorithm>
 #include <condition_variable>
 #include <future>
@@ -19,9 +20,8 @@ namespace cmudb {
 class LogManager {
 public:
   LogManager(DiskManager *disk_manager)
-      : next_lsn_(0), persistent_lsn_(INVALID_LSN),
-        disk_manager_(disk_manager) {
-    // TODO: you may initialize your own defined member variables here
+      : flush_lsn_(0), next_lsn_(0), persistent_lsn_(INVALID_LSN),
+        offset_(0), disk_manager_(disk_manager) {
     log_buffer_ = new char[LOG_BUFFER_SIZE];
     flush_buffer_ = new char[LOG_BUFFER_SIZE];
   }
@@ -32,6 +32,7 @@ public:
     log_buffer_ = nullptr;
     flush_buffer_ = nullptr;
   }
+
   // spawn a separate thread to wake up periodically to flush
   void RunFlushThread();
   void StopFlushThread();
@@ -45,22 +46,30 @@ public:
   inline char *GetLogBuffer() { return log_buffer_; }
 
 private:
-  // TODO: you may add your own member variables
-  // also remember to change constructor accordingly
+  // last log records in the flush_buffer_;
+  lsn_t flush_lsn_;
 
   // atomic counter, record the next log sequence number
   std::atomic<lsn_t> next_lsn_;
+
   // log records before & include persistent_lsn_ have been written to disk
   std::atomic<lsn_t> persistent_lsn_;
+
   // log buffer related
   char *log_buffer_;
   char *flush_buffer_;
+
+  int offset_;
+
   // latch to protect shared member variables
   std::mutex latch_;
+
   // flush thread
   std::thread *flush_thread_;
+
   // for notifying flush thread
   std::condition_variable cv_;
+
   // disk manager
   DiskManager *disk_manager_;
 };

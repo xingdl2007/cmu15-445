@@ -6,13 +6,14 @@
 #include "page/table_page.h"
 
 namespace cmudb {
+
 /*
  * deserialize a log record from log buffer
  * @return: true means deserialize succeed, otherwise can't deserialize cause
  * incomplete log record
  */
 bool LogRecovery::DeserializeLogRecord(const char *data,
-                                             LogRecord &log_record) {
+                                       LogRecord &log_record) {
   return false;
 }
 
