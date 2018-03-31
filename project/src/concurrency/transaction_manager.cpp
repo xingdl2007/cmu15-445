@@ -43,6 +43,7 @@ void TransactionManager::Commit(Transaction *txn) {
     // make sure log persist, pre lsn is the last one
     while (txn->GetPrevLSN() > log_manager_->GetPersistentLSN()) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      LOG_DEBUG("Commit(): spin....\n");
     }
   }
 
@@ -86,6 +87,7 @@ void TransactionManager::Abort(Transaction *txn) {
     // make sure log persist, pre lsn is the last one
     while (txn->GetPrevLSN() > log_manager_->GetPersistentLSN()) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      LOG_DEBUG("Abort(): spin....\n");
     }
   }
 

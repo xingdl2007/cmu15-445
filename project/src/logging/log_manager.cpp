@@ -26,8 +26,10 @@ void LogManager::RunFlushThread() {
           }
         }
         lock.unlock();
-        disk_manager_->WriteLog(flush_buffer_, LOG_BUFFER_SIZE);
-        SetPersistentLSN(flush_lsn_);
+        if (ENABLE_LOGGING && persistent_lsn_ + 1 != next_lsn_) {
+          disk_manager_->WriteLog(flush_buffer_, LOG_BUFFER_SIZE);
+          SetPersistentLSN(flush_lsn_);
+        }
       }
     });
   }
@@ -40,9 +42,10 @@ void LogManager::StopFlushThread() {
   if (ENABLE_LOGGING) {
     ENABLE_LOGGING = false;
 
-    std::lock_guard<std::mutex> lock(latch_);
-    cv_.notify_one();
+    std::unique_lock<std::mutex> lock(latch_);
     if (flush_thread_ && flush_thread_->joinable()) {
+      lock.unlock();
+      cv_.notify_one();
       flush_thread_->join();
     }
   }
