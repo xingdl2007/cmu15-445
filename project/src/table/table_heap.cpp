@@ -28,7 +28,7 @@ TableHeap::TableHeap(BufferPoolManager *buffer_pool_manager,
   first_page->WLatch();
   LOG_DEBUG("new table page created %d", first_page_id_);
 
-  first_page->Init(first_page_id_, PAGE_SIZE, INVALID_LSN, log_manager_, txn);
+  first_page->Init(first_page_id_, PAGE_SIZE, INVALID_PAGE_ID, log_manager_, txn);
   first_page->WUnlatch();
   buffer_pool_manager_->UnpinPage(first_page_id_, true);
 }

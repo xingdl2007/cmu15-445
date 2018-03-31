@@ -19,7 +19,7 @@ namespace cmudb {
 
 class LogManager {
 public:
-  LogManager(DiskManager *disk_manager)
+  explicit LogManager(DiskManager *disk_manager)
       : flush_lsn_(0), next_lsn_(0), persistent_lsn_(INVALID_LSN),
         offset_(0), disk_manager_(disk_manager) {
     log_buffer_ = new char[LOG_BUFFER_SIZE];
@@ -32,6 +32,10 @@ public:
     log_buffer_ = nullptr;
     flush_buffer_ = nullptr;
   }
+
+  // disable copy
+  LogManager(LogManager const &) = delete;
+  LogManager &operator=(LogManager const &) = delete;
 
   // spawn a separate thread to wake up periodically to flush
   void RunFlushThread();

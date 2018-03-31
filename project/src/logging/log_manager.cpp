@@ -21,12 +21,13 @@ void LogManager::RunFlushThread() {
         std::unique_lock<std::mutex> lock(latch_);
         // timeout?
         if (cv_.wait_for(lock, LOG_TIMEOUT) == std::cv_status::timeout) {
-          swapBuffer();
+          if (offset_ != 0) {
+            swapBuffer();
+          }
         }
         lock.unlock();
-
         disk_manager_->WriteLog(flush_buffer_, LOG_BUFFER_SIZE);
-        persistent_lsn_ = flush_lsn_;
+        SetPersistentLSN(flush_lsn_);
       }
     });
   }
@@ -93,7 +94,6 @@ lsn_t LogManager::AppendLogRecord(LogRecord &log_record) {
   // log_buffer is almost full?
   if (offset_ + log_record.size_ > LOG_BUFFER_SIZE) {
     swapBuffer();
-
     // wake up flush thread
     cv_.notify_one();
   }
