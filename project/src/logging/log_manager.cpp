@@ -16,15 +16,17 @@ void LogManager::RunFlushThread() {
   if (!ENABLE_LOGGING) {
     ENABLE_LOGGING = true;
 
-    std::unique_lock<std::mutex> lock(latch_);
     flush_thread_ = new std::thread([&]() {
       while (ENABLE_LOGGING) {
+        std::unique_lock<std::mutex> lock(latch_);
         // timeout?
         if (cv_.wait_for(lock, LOG_TIMEOUT) == std::cv_status::timeout) {
           std::swap(log_buffer_, flush_buffer_);
           offset_ = 0;
           flush_lsn_ = next_lsn_ - 1;
         }
+        lock.unlock();
+
         disk_manager_->WriteLog(flush_buffer_, LOG_BUFFER_SIZE);
         persistent_lsn_ = flush_lsn_;
       }
