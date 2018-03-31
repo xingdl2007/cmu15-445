@@ -25,10 +25,11 @@ void LogManager::RunFlushThread() {
             swapBuffer();
           }
         }
+        lsn_t delta = flush_lsn_;
         lock.unlock();
         if (ENABLE_LOGGING && persistent_lsn_ + 1 != next_lsn_) {
           disk_manager_->WriteLog(flush_buffer_, LOG_BUFFER_SIZE);
-          SetPersistentLSN(flush_lsn_);
+          SetPersistentLSN(delta);
         }
       }
     });
