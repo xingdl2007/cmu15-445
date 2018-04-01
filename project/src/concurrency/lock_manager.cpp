@@ -123,6 +123,14 @@ bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
     }
   }
   assert(src != lock_table_[rid].list.end());
+
+  // wait-die check: only older txn can wait
+  for (auto it = lock_table_[rid].list.begin(); it != tgt; ++it) {
+    if (it->txn_id < src->txn_id) {
+      return false;
+    }
+  }
+
   Request req = *src;
   req.granted = false;
   req.mode = LockMode::EXCLUSIVE;

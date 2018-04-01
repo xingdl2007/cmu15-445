@@ -1,5 +1,5 @@
 /**
- * recovery_manager.h
+ * log_recovery.h
  * Read log file from disk, redo and undo
  */
 

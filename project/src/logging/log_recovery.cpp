@@ -1,5 +1,5 @@
 /**
- * log_recovey.cpp
+ * log_recovery.cpp
  */
 
 #include "logging/log_recovery.h"
@@ -24,12 +24,16 @@ bool LogRecovery::DeserializeLogRecord(const char *data,
  *LSN with log_record's sequence number, and also build active_txn_ table &
  *lsn_mapping_ table
  */
-void LogRecovery::Redo() {}
+void LogRecovery::Redo() {
+
+}
 
 /*
  *undo phase on TABLE PAGE level(table/table_page.h)
  *iterate through active txn map and undo each operation
  */
-void LogRecovery::Undo() {}
+void LogRecovery::Undo() {
+
+}
 
 } // namespace cmudb
