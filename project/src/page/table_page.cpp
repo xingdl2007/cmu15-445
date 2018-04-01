@@ -97,7 +97,7 @@ bool TablePage::InsertTuple(const Tuple &tuple, RID &rid, Transaction *txn,
     txn->SetPrevLSN(lsn);
     SetLSN(lsn);
   }
-  LOG_DEBUG("Tuple inserted");
+  //LOG_DEBUG("Tuple inserted");
   return true;
 }
 

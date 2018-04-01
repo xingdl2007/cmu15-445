@@ -26,7 +26,7 @@ TableHeap::TableHeap(BufferPoolManager *buffer_pool_manager,
       static_cast<TablePage *>(buffer_pool_manager_->NewPage(first_page_id_));
   assert(first_page != nullptr); // todo: abort table creation?
   first_page->WLatch();
-  LOG_DEBUG("new table page created %d", first_page_id_);
+  //LOG_DEBUG("new table page created %d", first_page_id_);
 
   first_page->Init(first_page_id_, PAGE_SIZE, INVALID_PAGE_ID, log_manager_, txn);
   first_page->WUnlatch();

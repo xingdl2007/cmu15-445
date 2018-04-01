@@ -7,6 +7,40 @@ namespace cmudb {
 /** Load the virtual table extension
  *  Ref: https://sqlite.org/c3ref/load_extension.html
  */
+
+TEST(VtableTest, BasicTest) {
+  EXPECT_TRUE(sqlite3_threadsafe());
+  std::string db_file = "sqlite.db";
+  remove(db_file.c_str());
+  remove("vtable.db");
+  sqlite3 *db;
+  int rc;
+  rc = sqlite3_open(db_file.c_str(), &db);
+  EXPECT_EQ(rc, SQLITE_OK);
+
+  rc = sqlite3_enable_load_extension(db, 1);
+  EXPECT_EQ(rc, SQLITE_OK);
+
+  const char *zFile = "libvtable"; // shared library name
+  const char *zProc = 0;           // entry point within library
+  char *zErrMsg = 0;
+  rc = sqlite3_load_extension(db, zFile, zProc, &zErrMsg);
+  EXPECT_EQ(rc, SQLITE_OK);
+
+  EXPECT_TRUE(ExecSQL(
+      db, "CREATE VIRTUAL TABLE foo USING vtable('a int, b varchar(13)','foo_pk a')"));
+  EXPECT_TRUE(ExecSQL(db, "INSERT INTO foo VALUES(1, 'hello')"));
+  EXPECT_TRUE(ExecSQL(db, "SELECT * FROM foo ORDER BY a"));
+  EXPECT_TRUE(ExecSQL(db, "DROP TABLE foo"));
+
+  rc = sqlite3_close(db);
+  EXPECT_EQ(rc, SQLITE_OK);
+
+  remove(db_file.c_str());
+  remove("vtable.db");
+  return;
+}
+
 TEST(VtableTest, CreateTest) {
   EXPECT_TRUE(sqlite3_threadsafe());
   std::string db_file = "sqlite.db";
