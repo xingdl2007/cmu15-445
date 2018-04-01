@@ -45,6 +45,7 @@ void TransactionManager::Commit(Transaction *txn) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       //LOG_DEBUG("Commit(): spin....\n");
     }
+    LOG_DEBUG("txn %d: Commit....", txn->GetTransactionId());
   }
 
   // release all the lock
@@ -89,6 +90,7 @@ void TransactionManager::Abort(Transaction *txn) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       //LOG_DEBUG("Abort(): spin....\n");
     }
+    LOG_DEBUG("txn %d: Abort....", txn->GetTransactionId());
   }
 
   // release all the lock

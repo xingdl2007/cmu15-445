@@ -159,7 +159,7 @@ bool LockManager::Unlock(Transaction *txn, const RID &rid) {
 
   // if strict 2pl, when unlock txn must be in committed or abort state
   if (strict_2PL_) {
-    if (txn->GetState() != TransactionState::COMMITTED ||
+    if (txn->GetState() != TransactionState::COMMITTED &&
         txn->GetState() != TransactionState::ABORTED) {
       txn->SetState(TransactionState::ABORTED);
       return false;

@@ -67,8 +67,8 @@ bool TableHeap::InsertTuple(const Tuple &tuple, RID &rid, Transaction *txn) {
         return false;
       }
       new_page->WLatch();
-      // std::cout << "new table page " << next_page_id << " created" <<
-      // std::endl;
+      std::cout << "new table page " << next_page_id << " created" <<
+                std::endl;
       cur_page->SetNextPageId(next_page_id);
       new_page->Init(next_page_id, PAGE_SIZE, cur_page->GetPageId(),
                      log_manager_, txn);

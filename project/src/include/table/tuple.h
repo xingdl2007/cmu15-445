@@ -27,7 +27,7 @@ public:
   inline Tuple() : allocated_(false), rid_(RID()), size_(0), data_(nullptr) {}
 
   // constructor for table heap tuple
-  Tuple(RID rid) : allocated_(false), rid_(rid) {}
+  Tuple(RID rid) : allocated_(false), rid_(rid), size_(0), data_(nullptr) {}
 
   // constructor for creating a new tuple based on input value
   Tuple(std::vector<Value> values, Schema *schema);

@@ -12,7 +12,7 @@
 namespace cmudb {
 
 Tuple::Tuple(std::vector<Value> values, Schema *schema) : allocated_(true) {
-  assert((int)values.size() == schema->GetColumnCount());
+  assert((int) values.size() == schema->GetColumnCount());
 
   // step1: calculate size of the tuple
   int32_t tuple_size = schema->GetLength();
