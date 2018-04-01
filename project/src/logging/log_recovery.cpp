@@ -14,6 +14,7 @@ namespace cmudb {
  */
 bool LogRecovery::DeserializeLogRecord(const char *data,
                                        LogRecord &log_record) {
+
   return false;
 }
 

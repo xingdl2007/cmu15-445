@@ -49,10 +49,15 @@ public:
   inline void SetPersistentLSN(lsn_t lsn) { persistent_lsn_ = lsn; }
   inline char *GetLogBuffer() { return log_buffer_; }
 
-  void WakeupFlushThread();
+  inline std::promise<void> *GetPromise() { return promise; }
+  inline void SetPromise(std::promise<void> *p) { promise = p; }
+
+  void WakeupFlushThread(std::promise<void> *promise);
 
 private:
   inline void swapBuffer();
+
+  std::promise<void> *promise;
 
   // last log records in the flush_buffer_;
   lsn_t flush_lsn_;

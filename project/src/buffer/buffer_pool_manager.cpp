@@ -82,7 +82,8 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
   // dirty? write back
   if (res->is_dirty_) {
     while (res->GetLSN() > log_manager_->GetPersistentLSN()) {
-      log_manager_->WakeupFlushThread();
+      std::promise<void> promise;
+      log_manager_->WakeupFlushThread(&promise);
     }
     disk_manager_->WritePage(res->page_id_, res->GetData());
   }
@@ -196,7 +197,8 @@ Page *BufferPoolManager::NewPage(page_id_t &page_id) {
   // dirty? write back
   if (res->is_dirty_) {
     while (res->GetLSN() > log_manager_->GetPersistentLSN()) {
-      log_manager_->WakeupFlushThread();
+      std::promise<void> promise;
+      log_manager_->WakeupFlushThread(&promise);
     }
     disk_manager_->WritePage(res->page_id_, res->GetData());
   }

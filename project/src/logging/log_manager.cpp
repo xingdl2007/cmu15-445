@@ -20,16 +20,21 @@ void LogManager::RunFlushThread() {
       while (ENABLE_LOGGING) {
         std::unique_lock<std::mutex> lock(latch_);
         // timeout?
-        if (cv_.wait_for(lock, LOG_TIMEOUT) == std::cv_status::timeout) {
-          if (offset_ != 0) {
-            swapBuffer();
-          }
+        if (cv_.wait_for(lock, LOG_TIMEOUT) == std::cv_status::timeout &&
+            offset_ != 0) {
+          swapBuffer();
         }
         lsn_t delta = flush_lsn_;
         lock.unlock();
-        if (ENABLE_LOGGING && persistent_lsn_ + 1 != next_lsn_) {
+
+        if (ENABLE_LOGGING && !disk_manager_->GetFlushState()
+            && persistent_lsn_ + 1 != next_lsn_) {
           disk_manager_->WriteLog(flush_buffer_, LOG_BUFFER_SIZE);
           SetPersistentLSN(delta);
+
+          if (promise != nullptr) {
+            promise->set_value();
+          }
         }
       }
     });
@@ -43,10 +48,10 @@ void LogManager::StopFlushThread() {
   if (ENABLE_LOGGING) {
     ENABLE_LOGGING = false;
 
-    std::unique_lock<std::mutex> lock(latch_);
+    cv_.notify_one();
+
+    std::lock_guard<std::mutex> lock(latch_);
     if (flush_thread_ && flush_thread_->joinable()) {
-      lock.unlock();
-      cv_.notify_one();
       flush_thread_->join();
     }
   }
@@ -56,7 +61,10 @@ void LogManager::StopFlushThread() {
  * should be called when holding the lock
  */
 inline void LogManager::swapBuffer() {
-  std::swap(log_buffer_, flush_buffer_);
+  char *tmp = log_buffer_;
+  log_buffer_ = flush_buffer_;
+  flush_buffer_ = tmp;
+
   offset_ = 0;
   flush_lsn_ = next_lsn_ - 1;
 }
@@ -65,11 +73,21 @@ inline void LogManager::swapBuffer() {
  * wake up flush thread, only called by buffer pool manager
  * when it wants to force flush
  */
-void LogManager::WakeupFlushThread() {
-  std::lock_guard<std::mutex> lock(latch_);
-  swapBuffer();
+void LogManager::WakeupFlushThread(std::promise<void> *promise) {
+  {
+    std::lock_guard<std::mutex> lock(latch_);
+    swapBuffer();
+    SetPromise(promise);
+  }
+
   // wake up flush thread
   cv_.notify_one();
+
+  // waiting for flush done
+  if (promise != nullptr) {
+    promise->get_future().wait();
+  }
+  SetPromise(nullptr);
 }
 
 /*
