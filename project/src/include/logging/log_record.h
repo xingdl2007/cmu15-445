@@ -111,6 +111,12 @@ public:
 
   inline RID &GetInsertRID() { return insert_rid_; }
 
+  inline RID &GetUpdateRID() { return update_rid_; }
+
+  inline Tuple &GetUpdateNewTuple() { return new_tuple_; }
+
+  inline Tuple &GetUpdateOldTuple() { return old_tuple_; }
+
   inline page_id_t GetNewPageRecord() { return prev_page_id_; }
 
   inline int32_t GetSize() { return size_; }

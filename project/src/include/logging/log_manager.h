@@ -20,7 +20,7 @@ namespace cmudb {
 class LogManager {
 public:
   explicit LogManager(DiskManager *disk_manager)
-      : flush_lsn_(0), next_lsn_(0), persistent_lsn_(INVALID_LSN),
+      : promise(nullptr), flush_lsn_(0), next_lsn_(0), persistent_lsn_(INVALID_LSN),
         offset_(0), disk_manager_(disk_manager) {
     log_buffer_ = new char[LOG_BUFFER_SIZE];
     flush_buffer_ = new char[LOG_BUFFER_SIZE];

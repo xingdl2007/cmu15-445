@@ -50,8 +50,9 @@ void LogManager::StopFlushThread() {
 
     cv_.notify_one();
 
-    std::lock_guard<std::mutex> lock(latch_);
+    std::unique_lock<std::mutex> lock(latch_);
     if (flush_thread_ && flush_thread_->joinable()) {
+      lock.unlock();
       flush_thread_->join();
     }
   }
