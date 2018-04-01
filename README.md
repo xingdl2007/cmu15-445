@@ -10,5 +10,5 @@
 
 - [x] Project 4 - Logging & Recovery
 
-- [ ] Project 5 - Extra Credit
+- [ ] Project 5 - Extra Credit (Benchmarking a DBMS, skip this project)
 
