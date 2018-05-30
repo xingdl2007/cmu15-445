@@ -27,7 +27,7 @@ class ExtendibleHash : public HashTable<K, V> {
     Bucket() = default;
     explicit Bucket(size_t i, int d) : id(i), depth(d) {}
     std::map<K, V> items;          // key-value pairs
-    std::shared_ptr<Bucket> next;  // overflow bucket
+    bool overflow = false;         // overflow
     size_t id = 0;                 // id of Bucket
     int depth = 0;                 // local depth counter
   };

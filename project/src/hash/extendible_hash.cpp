@@ -80,15 +80,6 @@ bool ExtendibleHash<K, V>::Find(const K &key, V &value) {
       value = bucket->items[key];
       return true;
     }
-    // search overflow bucket if has
-    while (bucket->next) {
-      auto next = bucket->next;
-      if (next->items.find(key) != next->items.end()) {
-        value = next->items[key];
-        return true;
-      }
-      bucket = next;
-    }
   }
   return false;
 }
@@ -106,13 +97,6 @@ bool ExtendibleHash<K, V>::Remove(const K &key) {
   if (directory_[index]) {
     auto bucket = directory_[index];
     cnt += bucket->items.erase(key);
-
-    // search overflow bucket if has
-    while (bucket->next) {
-      auto next = bucket->next;
-      cnt += next->items.erase(key);
-      bucket = next;
-    }
     pair_count -= cnt;
   }
   return cnt != 0;
@@ -142,23 +126,15 @@ ExtendibleHash<K, V>::split(std::shared_ptr<Bucket> &b) {
       // update id;
       b->id = res->id;
     }
-    // which all keys in current bucket have same hash
+    // which all keys in current bucket have same hash value, should be a rare case
     if (b->depth == sizeof(size_t)*8) {
-      break;
+      b->overflow = true;
+      return nullptr;
     }
   }
+
   // maintain bucket count current in use
   ++bucket_count_;
-
-  // overflow condition, should be a rare case
-  if (b->depth == sizeof(size_t)*8) {
-    // last one
-    while (b->next) {
-      b = b->next;
-    }
-    b->next = std::move(res);
-    return nullptr;
-  }
   return res;
 }
 
@@ -199,16 +175,15 @@ void ExtendibleHash<K, V>::Insert(const K &key, const V &value) {
   ++pair_count;
 
   // may need split & redistribute bucket
-  if (bucket->items.size() > bucket_size_) {
+  if (bucket->items.size() > bucket_size_ && !bucket->overflow) {
     // record original bucket index and local depth
     auto old_index = bucket->id;
     auto old_depth = bucket->depth;
 
     std::shared_ptr<Bucket> new_bucket = split(bucket);
 
-    // if overflow, alloc overflow bucket
+    // if overflow restore original local depth
     if (new_bucket == nullptr) {
-      // restore
       bucket->depth = old_depth;
       return;
     }
