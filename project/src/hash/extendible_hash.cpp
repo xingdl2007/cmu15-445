@@ -181,11 +181,11 @@ void ExtendibleHash<K, V>::Insert(const K &key, const V &value) {
   std::lock_guard<std::mutex> lock(mutex_);
   size_t bucket_id = bucketIndex(key);
 
+  assert(bucket_id < directory_.size());
   if (directory_[bucket_id] == nullptr) {
     directory_[bucket_id] = std::make_shared<Bucket>(bucket_id, depth);
     ++bucket_count_;
   }
-
   auto bucket = directory_[bucket_id];
 
   // already in bucket, override

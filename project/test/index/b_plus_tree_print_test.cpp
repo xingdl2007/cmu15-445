@@ -17,16 +17,16 @@ namespace cmudb {
 std::string usageMessage() {
   std::string message =
       "Enter any of the following commands after the prompt > :\n"
-          "\ti <k>  -- Insert <k> (int64_t) as both key and value).\n"
-          "\tf <filename>  -- insert keys by reading file.\n"
-          "\td <filename>  -- delete keys by reading file.\n"
-          "\ta <k>  -- Delete key <k> and its associated value.\n"
-          "\tr <k1> <k2> -- Print the keys and values found in the range [<k1>, "
-          "<k2>]\n"
-          "\tv -- Toggle verbose.\n"
-          "\tt -- Print the B+ tree.\n"
-          "\tq -- Quit. (Or use Ctl-D.)\n"
-          "\t? -- Print this help message.\n\n";
+      "\ti <k>  -- Insert <k> (int64_t) as both key and value).\n"
+      "\tf <filename>  -- insert keys by reading file.\n"
+      "\td <filename>  -- delete keys by reading file.\n"
+      "\ta <k>  -- Delete key <k> and its associated value.\n"
+      "\tr <k1> <k2> -- Print the keys and values found in the range [<k1>, "
+      "<k2>]\n"
+      "\tv -- Toggle verbose.\n"
+      "\tt -- Print the B+ tree.\n"
+      "\tq -- Quit. (Or use Ctl-D.)\n"
+      "\t? -- Print this help message.\n\n";
   return message;
 }
 
@@ -54,6 +54,7 @@ TEST(BptTreeTest, UnitTest) {
   // create b+ tree
   BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm,
                                                            comparator);
+  int count = 0;
   // create transaction
   Transaction *transaction = new Transaction(0);
   while (!quit) {
@@ -97,6 +98,8 @@ TEST(BptTreeTest, UnitTest) {
       break;
     default:std::cin.ignore(256, '\n');
       std::cout << usageMessage();
+      if (++count == 10)
+        quit = true;
       break;
     }
   }

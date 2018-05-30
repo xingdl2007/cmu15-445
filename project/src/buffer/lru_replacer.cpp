@@ -23,8 +23,7 @@ template <typename T> void LRUReplacer<T>::Insert(const T &value) {
 
   auto it = table_.find(value);
   if (it == table_.end()) {
-    auto ptr = std::make_unique<node>(value, tail_);
-    tail_->next = std::move(ptr);
+    tail_->next = std::make_unique<node>(value, tail_);
     tail_ = tail_->next.get();
     table_.emplace(value, tail_);
     ++size_;

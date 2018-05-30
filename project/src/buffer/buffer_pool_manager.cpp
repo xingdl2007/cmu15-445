@@ -143,6 +143,7 @@ bool BufferPoolManager::FlushPage(page_id_t page_id) {
   Page *page;
   if (page_table_->Find(page_id, page)) {
     disk_manager_->WritePage(page_id, page->GetData());
+    return true;
   }
   return false;
 }
