@@ -58,8 +58,6 @@ public:
   std::string ToString(bool verbose) const;
   void QueueUpChildren(std::queue<BPlusTreePage *> *queue,
                        BufferPoolManager *buffer_pool_manager);
-  void Verify(std::queue<BPlusTreePage *> *queue,
-              BufferPoolManager *buffer_pool_manager);
 private:
   void CopyHalfFrom(MappingType *items, int size,
                     BufferPoolManager *buffer_pool_manager);

@@ -201,7 +201,7 @@ void ExtendibleHash<K, V>::Insert(const K &key, const V &value) {
       directory_[bucket->id] = bucket;
       directory_[new_bucket->id] = new_bucket;
 
-      // update to right index: for not the split point
+      // update to right index: for buckets not the split point
       for (size_t i = 0; i < size; ++i) {
         if (directory_[i]) {
           // clear stale relation
@@ -223,7 +223,7 @@ void ExtendibleHash<K, V>::Insert(const K &key, const V &value) {
         directory_[i].reset();
       }
 
-      // all new bucket to directory
+      // add all two new buckets to directory
       directory_[bucket->id] = bucket;
       directory_[new_bucket->id] = new_bucket;
 
